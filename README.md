@@ -1,6 +1,8 @@
 # SDCP
 
-A small work-in-progress library providing a nodejs front end to the SDCP. More information at https://github.com/cbd-tech/SDCP-Smart-Device-Control-Protocol-V3.0.0/blob/main/SDCP(Smart%20Device%20Control%20Protocol)_V3.0.0_EN.md. Functionality is provided as both promises and callback depending on your preference.
+A small work-in-progress library providing a nodejs front end to the SDCP. More information at https://github.com/cbd-tech/SDCP-Smart-Device-Control-Protocol-V3.0.0/blob/main/SDCP(Smart%20Device%20Control%20Protocol)_V3.0.0_EN.md. 
+
+Functionality is provided as both promises and callback depending on your preference.
 
 ## Installation
 
@@ -94,9 +96,18 @@ Printers are event emiters and will emit the following events:
 - `attributes` - When an unsolicted attributes update is received
 - `message` - When a websocket message is received that is currently not parsed
 
-## Interacting with Printers
+```js
+Printer.Connect().then(()=>
+{
+	["notice", "status", "attributes"].forEach(type=>Printer.on(type, (event)=>
+	{
+		console.log(`\n${type.toUpperCase()}:`);
+		console.log(event);
+	}));
+});
+```
 
-The following commands are wrapped up by SDCPPrinter:
+The following commands are also wrapped up by the SDCPPrinter class:
 
 #### `GetStatus ()`
 Get the current status of the printer

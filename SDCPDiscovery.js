@@ -7,7 +7,7 @@ const debug = false;
 
 /**
  * Discover SDCP devices on the network
- * @param {{timeout: number}|number} [Options] - Options for the discovery process or timeout value
+ * @param {{timeout: number, connect: bool}|number} [Options] - Options for the discovery process or timeout value
  * @param {function(Error?, SDCPPrinter[]): void} [Callback] - Callback function to be called when the discovery process is complete
  * @returns {Promise<SDCPPrinter[]>} - Promise that resolves with an array of SDCPPrinter objects
 */
@@ -17,6 +17,7 @@ function SDCPDiscovery(Options, Callback)
 	if (typeof Options === 'number')   {Options = {timeout: Options};}
 	if (typeof Options !== 'object')   {Options = {};}
 	if (Options.timeout === undefined) {Options.timeout = 1000;}
+	if (Options.connect === undefined) {Options.connect = false;}
 
 	//No callback? Handle this as a promise
 	if (!Callback)
@@ -36,10 +37,13 @@ function SDCPDiscovery(Options, Callback)
 			Callback(null, Devices);
 
 		//Now connect the printers
-		for (var Printer of Devices)
+		if (Options.connect)
 		{
-			if (Printer.ProtocolVersion === "V3.0.0")
-				Printer.Connect();
+			for (var Printer of Devices)
+			{
+				if (Printer.ProtocolVersion === "V3.0.0")
+					Printer.Connect();
+			}
 		}
 	}, Options.timeout);
 

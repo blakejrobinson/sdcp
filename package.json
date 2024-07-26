@@ -1,12 +1,15 @@
 {
   "name": "sdcp",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "main": "index.js",
   "keywords": [
 	"SDCP",
 	"Smart Device Control Protocol",
 	"3D printer"
   ],
+  "repository": {
+	"type": "git",
+	"url": "git+https://github.com/blakejrobinson/sdcp/"},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
