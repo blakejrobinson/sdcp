@@ -24,6 +24,14 @@ SDCP.SDCPDiscovery().then((devices) =>
 });
 ```
 
+`SDCPDiscovery` can take an optional object parameter:
+```js
+{
+	timeout: {number=1000} 		//The amount of time to wait for all printers to reply
+	connect: {boolean=false}	//If set to true, discover will also connect to all V3.0.0+ printers
+}
+```
+
 ## Connecting to and communicating with a printer
 
 Once you know your printers, you can connect to them in one of two ways:
