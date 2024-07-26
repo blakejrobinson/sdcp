@@ -1,0 +1,19 @@
+{
+  "name": "sdcp",
+  "version": "0.2.8",
+  "main": "index.js",
+  "keywords": [
+	"SDCP",
+	"Smart Device Control Protocol",
+	"3D printer"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Blake Robinson",
+  "license": "ISC",
+  "description": "A handler for the SDCP protocol (https://github.com/cbd-tech/SDCP-Smart-Device-Control-Protocol-V3.0.0/blob/main/SDCP(Smart%20Device%20Control%20Protocol)_V3.0.0_EN.md)",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
