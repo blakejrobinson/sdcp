@@ -307,7 +307,7 @@ Printer.Connect().then(()=>
 	Printer.Upload("C:\\Flame_Defender_Bust_2_2024_0522_2328.ctb", 
 	{
 		//Called pre-upload and every 1mb uploaded
-		ProgressCallback: (progress)=>
+		progresscallback: (progress)=>
 		{
 			console.log(progress);
 		}
