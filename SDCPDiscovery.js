@@ -34,7 +34,7 @@ function SDCPDiscovery(Options, Callback)
 		if (debug) console.log('Discovery process complete');
 		if (client) client.close();
 		if (typeof Callback === "function") 
-			Callback(null, Devices);
+			Callback(undefined, Devices);
 
 		//Now connect the printers
 		if (Options.connect)
@@ -67,6 +67,7 @@ function SDCPDiscovery(Options, Callback)
 			PrinterInfo.Data.Attributes.MainboardIP = rinfo.address;
 
 		PrinterInfo.Data.Id = PrinterInfo.Id;
+		if (PrinterInfo.Data.Attributes) PrinterInfo.Data.Attributes.Id = PrinterInfo.Id;
 		Devices.push(new SDCPPrinter(PrinterInfo.Data && PrinterInfo.Data.Attributes ? PrinterInfo.Data.Attributes : PrinterInfo.Data ? PrinterInfo.Data : PrinterInfo));
 		//client.close();
 	});

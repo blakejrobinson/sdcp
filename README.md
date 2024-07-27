@@ -296,6 +296,42 @@ Printer.Connect().then(()=>
 ```
 #### At some point I'll be fully implementing this inside SDCP
 
+## File uploading
+Files can be uploaded using `SDCPPrinter.Upload()`
+
+#### `Upload (File, [Options])`
+`File` points to a local file, `Options` can be used to enable/disable verification or have a progress callback called each chunk:
+```js
+Printer.Connect().then(()=>
+{
+	Printer.Upload("C:\\Flame_Defender_Bust_2_2024_0522_2328.ctb", 
+	{
+		//Called pre-upload and every 1mb uploaded
+		ProgressCallback: (progress)=>
+		{
+			console.log(progress);
+		}
+	}).then((result)=>
+	{
+		console.log(result);
+	});
+});
+```
+```js
+{Status: 'Preparing','S-File-MD5': 'fd8c8c66c3ae82f1be0b544d1'...}
+{Status: 'Uploading','S-File-MD5': 'fd8c8c66c3ae82f1be0b544d1'...}
+...
+{Status: 'Uploading','S-File-MD5': 'fd8c8c66c3ae82f1be0b544d1'...}
+{Status: 'Complete', 'S-File-MD5': 'fd8c8c66c3ae82f1be0b544d1'...}
+```
+`Options` currently supports:
+```js
+{
+	verification: {boolean} 			//Whether to verify the upload
+	callback:     {function(progress)}	//A callback that's called every 1mb
+}
+```
+
 ## Custom commands and handling
 `SDCPPrinter.SendCommand` can be used to send commands not yet wrapped. Here is an example of sending the GetFiles command without using the wrapped function:
 ```js
@@ -339,6 +375,5 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 **Be careful** when sending custom commands. I have crashed my printer by sending unexpected data.
 
 ## TBD
-- File upload handling,
 - Built in camera stream/screenshot handling
 - Wrappers for timelapse downloading

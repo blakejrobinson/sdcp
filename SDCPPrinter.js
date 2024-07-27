@@ -3,9 +3,11 @@ const SDCPCommand  = require('./SDCPCommand');
 const EventEmitter = require('events');
 const WebSocket = require('ws');
 const dgram = require('dgram');
-const SDCP = require('.');
+const fs = require('fs');
+const crypto = require('crypto');
+const path = require('path');
 
-const debug = true;
+const debug = false;
 
 /**
  * Represents an SDCP (Simple Device Control Protocol) Printer
@@ -39,6 +41,8 @@ class SDCPPrinter extends EventEmitter
 	#StatusRoute = [];
 	/** Route statuses (FIFO queue) */
 	#AttributeRoute = [];
+	/** Connected? */
+	Connected = false;
 
 	/**
 	 * Create a new SDCPPrinter instance
@@ -68,7 +72,7 @@ class SDCPPrinter extends EventEmitter
 	Connect(MainboardIP, Callback)
 	{
 		if (Callback === undefined) 
-			return new Promise((resolve,reject) => {this.Connect(MainboardIP, function(err) {if (err) return reject.call(err); resolve();});});
+			return new Promise((resolve,reject) => {this.Connect(MainboardIP, function(err) {if (err) return reject(err); resolve();});});
 
 		if (typeof MainboardIP === 'function') {Callback = MainboardIP; MainboardIP = undefined;}
 		if (MainboardIP === undefined) MainboardIP = this.MainboardIP;
@@ -108,6 +112,7 @@ class SDCPPrinter extends EventEmitter
 			this.emit('connected', { ip: this.#Websocket._socket.remoteAddress, port: this.#Websocket._socket.remotePort });
 			if (Callback) Callback.call(Printer);
 			Callback = undefined;
+			this.Connected = true;
 			//this.SendCommand(new SDCPCommand.SDCPCommandAttributes());
 			//this.SendCommand(new SDCPCommand.SDCPCommandStatus());
 		});
@@ -197,17 +202,19 @@ class SDCPPrinter extends EventEmitter
 		this.#Websocket.on('error', (error) => 
 		{
 			if (debug) console.error(`Error: ${error}`);
-			this.emit('error', error);
+			//this.emit('error', error);
 			if (Callback) Callback.call(Printer, error);
-			Callback = undefined;
+				Callback = undefined;
 		});
 	
 		this.#Websocket.on('close', () => 
 		{
-			if (debug) console.log(`Disconnected from ${this.ip}:${this.port}`);
+			if (debug) console.log(`Disconnected`);
 			this.emit('disconnected');
+			this.#Websocket = undefined;
+			this.Connected = false;
 			if (this.#AutoReconnect !== false)
-				setTimeout(this.Connect(), 5000);
+				setTimeout(()=>{this.Connect.call(Printer, (err)=>{});}, 5000);
 		});		
 	}
 
@@ -286,8 +293,7 @@ class SDCPPrinter extends EventEmitter
 		if (!this.#Websocket)
 			Callback(new Error('Not connected to printer'));
 		if (typeof Command === 'number') Command = {Data: {Cmd: Command}};
-
-		const crypto = require('crypto');
+		
 		if (typeof Command !== 'object') 				Command = {};
 		if (Command.Id === undefined) 					Command.Id = this.Id;
 		if (typeof Command.Data !== 'object') 			Command.Data = {};
@@ -499,7 +505,123 @@ class SDCPPrinter extends EventEmitter
 										: 'Unknown error'));
 			Callback(undefined, response && response.Data && response.Data.Data ? response.Data.Data.VideoUrl : undefined);
 		}).catch(err=>Callback(err));
-	}	
+	}
+
+	/**
+	 * Calculate MD5 hash of a file
+	 * @param {string} filePath - Path to the file
+	 * @returns {Promise<string>} - MD5 hash of the file
+	 */
+	async #calculateFileMD5(filePath) 
+	{
+		return new Promise((resolve, reject) => 
+		{
+			const hash = crypto.createHash('md5');
+			const stream = fs.createReadStream(filePath);
+			stream.on('data', (data) => hash.update(data));
+			stream.on('end', () => resolve(hash.digest('hex')));
+			stream.on('error', reject);
+		});
+	}
+		
+	/**
+	 * Upload a file to the printer
+	 * @param {string} File - The path to the file to upload
+	 * @param {{Verification: boolean, ProgressCallback: function(Progress): void}} Options - The options to use
+	 * @param {function(Error?, Object): void} [Callback] - Callback function to be called when the command is complete
+	 * @returns {Promise<Object>} - Promise that resolves with the response from the printer
+	 */
+	async UploadFile(File, Options, Callback)
+	{
+		if (typeof Options === 'function') {Callback = Options; Options = {};}
+		if (Options === undefined) Options = {};
+		if (Callback === undefined) 
+			return new Promise((resolve,reject) => {this.UploadFile(File, Options, (err,response) => {if (err) return reject(err); resolve(response);});});
+
+		const { Verification: verification = true, ProgressCallback: progressCallback } = Options;
+		const fileStats = await fs.promises.stat(File);
+		const totalSize = fileStats.size;
+		const chunkSize = 1024 * 1024; // 1MB chunks
+		const uuid = crypto.randomBytes(32).toString('hex');
+
+		let uploadedSize = 0;
+		let md5Hash = crypto.createHash('md5');
+		let Result = undefined;
+		let filename = path.basename(File);
+		const fileMD5 = await this.#calculateFileMD5(File);
+
+		if (typeof progressCallback === 'function') 
+			progressCallback({Status: "Preparing",
+						"S-File-MD5": fileMD5,
+						Uuid: uuid,
+						Offset: uploadedSize,
+						TotalSize: totalSize,
+						Complete: uploadedSize / totalSize,
+						File: filename});
+
+		const fileHandle = await fs.promises.open(File, 'r');
+		try 
+		{
+			while (uploadedSize < totalSize) 
+			{
+				const buffer = Buffer.alloc(chunkSize);
+				const { bytesRead } = await fileHandle.read(buffer, 0, chunkSize, uploadedSize);
+				if (bytesRead === 0) break;			
+			
+				const chunk = buffer.slice(0, bytesRead);
+				md5Hash.update(chunk);
+
+				const formData = new FormData();
+				formData.append('Uuid', uuid);
+				formData.append('Offset', uploadedSize.toString());
+				formData.append('TotalSize', totalSize.toString());
+				formData.append('Check', verification ? '1' : '0');
+				formData.append('S-File-MD5', fileMD5);
+				formData.append('File', new Blob([chunk]), filename);//  { filename: 'chunk' });
+				
+				if (debug) console.log(`Uploading chunk of size ${chunk.length} bytes`);
+				const response = await fetch(`http://${this.MainboardIP}:3030/uploadFile/upload`, 
+				{
+					method: 'POST',
+					body: formData
+				});
+		
+				if (!response.ok) 
+				{
+					const errorData = await response.json();
+					if (debug) console.error(`Upload failed: ${JSON.stringify(errorData)}`);
+					throw new Error(`Upload failed: ${JSON.stringify(errorData)}`);
+				}
+				else 
+					Result = await response.json();
+		
+				uploadedSize += chunk.length;
+				if (typeof progressCallback === 'function') 
+					progressCallback({Status: "Uploading",
+								"S-File-MD5": fileMD5,
+								Uuid: uuid,
+								Offset: uploadedSize,
+								TotalSize: totalSize,
+								Complete: uploadedSize / totalSize,
+								File: filename});
+			}	
+
+			if (debug) console.log('File upload completed successfully');			
+		}
+		finally 
+		{
+      		await fileHandle.close();			
+    	}
+
+		Callback(undefined, {Status: "Complete",
+							 "S-File-MD5": fileMD5,
+							 Uuid: uuid,
+							 Offset: uploadedSize,
+							 TotalSize: totalSize,
+							 Complete: uploadedSize / totalSize,
+							 File: filename,
+							 Result: Result});
+	}
 
 	/**
 	 * JSON representation of the printer

@@ -113,7 +113,7 @@ class SDCPCommandFileList extends SDCPCommand
 	 */
 	constructor(Path)
 	{
-		if (typeof Path !== "string") Path = "/usb"
+		if (typeof Path !== "string" || Path === "") Path = "/"
 
 		super();
 		this.Data.Cmd = 258;
