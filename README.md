@@ -377,3 +377,4 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 ## TBD
 - Built in camera stream/screenshot handling
 - Wrappers for timelapse downloading
+- An example that pulls it all together and shows how to use everything
