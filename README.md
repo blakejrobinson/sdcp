@@ -327,8 +327,8 @@ Printer.Connect().then(()=>
 `Options` currently supports:
 ```js
 {
-	verification: {boolean} 			//Whether to verify the upload
-	callback:     {function(progress)}	//A callback that's called every 1mb
+	verification:     {boolean} 			//Whether to verify the upload
+	progresscallback: {function(progress)}	//A callback that's called every 1mb
 }
 ```
 
