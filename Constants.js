@@ -153,8 +153,7 @@ const SDCP_ERROR_CODE_DESCRIPTIONS = Object.freeze({
     [SDCP_ERROR_CODE.FORMAT_FAILED]: "File format is incorrect"
 });
 
-module.exports = 
-{
+const Constants = {
 	SDCP_FROM,
 	SDCP_FILE_TRANSFER_ACK,
 	SDCP_PRINT_ERROR,
@@ -167,3 +166,5 @@ module.exports =
 	SDCP_ERROR_CODE,
 	SDCP_ERROR_CODE_DESCRIPTIONS
 }
+
+module.exports = Constants;

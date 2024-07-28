@@ -1,4 +1,4 @@
-const SDCPPrinter = require('./SDCPPrinter.js');
+const SDCPPrinter    = require('./SDCPPrinter.js');
 const dgram = require('dgram');
 const debug = false;
 
@@ -68,8 +68,8 @@ function SDCPDiscovery(Options, Callback)
 
 		PrinterInfo.Data.Id = PrinterInfo.Id;
 		if (PrinterInfo.Data.Attributes) PrinterInfo.Data.Attributes.Id = PrinterInfo.Id;
-		Devices.push(new SDCPPrinter(PrinterInfo.Data && PrinterInfo.Data.Attributes ? PrinterInfo.Data.Attributes : PrinterInfo.Data ? PrinterInfo.Data : PrinterInfo));
-		//client.close();
+		var PrinterType = SDCPDiscovery.PrinterType(PrinterInfo.Data && PrinterInfo.Data.Attributes ? PrinterInfo.Data.Attributes : PrinterInfo.Data);
+		Devices.push(new PrinterType(PrinterInfo.Data && PrinterInfo.Data.Attributes ? PrinterInfo.Data.Attributes : PrinterInfo.Data ? PrinterInfo.Data : PrinterInfo));
 	});
 
 	if (debug) console.log('Broadcasting discovery message...');
@@ -92,17 +92,35 @@ function SDCPDiscovery(Options, Callback)
  * @param {function(Error?, SDCPPrinter): void} Callback - Callback function to be called when the connection is complete
  * @returns {Promise<SDCPPrinter[]>} - Promise that resolves with an array of SDCPPrinter objects
  */
-function SDCPConnect(MainboardIP, Callback)
+function SDCPConnect(MainboardIP, PrinterType, Callback)
 {
+	if (typeof PrinterType === 'function') {Callback = PrinterType; PrinterType = SDCPPrinter;}
+	if (typeof PrinterType !== 'function') PrinterType = SDCPPrinter;
+
 	if (typeof Callback !== 'function') 
 		return new Promise((resolve,reject) => {SDCPConnect(MainboardIP, function(err,device) {if (err) return reject(err); resolve(device);});});
-	var Printer = new SDCPPrinter(MainboardIP);
+	var Printer = new PrinterType(MainboardIP);
 	Printer.Connect().then(()=>
 	{
 		Callback(null, Printer);
 	}).catch((err) => Callback(err));
 }
 
-SDCPDiscovery.Connect = SDCPConnect;
+const SDCPPrinterUDP = require('./SDCPPrinterUDP.js');
+const SDCPPrinterWS  = require('./SDCPPrinterWS.js');
+/**
+ * Return the correct printer handler to use
+ * @param {Object} about 
+ * @returns {SDCPPrinter} - The printer handler to use
+ */
+function PrinterType(about)
+{
+	if (about && about.ProtocolVersion === "V3.0.0") return SDCPPrinterWS;
+	if (about && about.ProtocolVersion === "V1.0.0") return SDCPPrinterUDP;
+	return SDCPPrinter;
+}
+
+SDCPDiscovery.Connect     = SDCPConnect;
+SDCPDiscovery.PrinterType = PrinterType;
 
 module.exports = SDCPDiscovery;

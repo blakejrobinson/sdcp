@@ -2,13 +2,13 @@
 
 A small work-in-progress library providing a nodejs front end to the SDCP. More information at https://github.com/cbd-tech/SDCP-Smart-Device-Control-Protocol-V3.0.0/blob/main/SDCP(Smart%20Device%20Control%20Protocol)_V3.0.0_EN.md. 
 
-Functionality is provided as both promises and callback depending on your preference.
+Functionality is provided as both promises and callback depending on your preference. Feel free to contribute if you want to improve or get extra features in.
 
 ## Installation
 
 Install it using [npm]:
 
-    $ npm install sdcp
+    npm install sdcp
 
 ## Getting a list of printers on the network
 
@@ -36,23 +36,25 @@ SDCP.SDCPDiscovery().then((devices) =>
 
 Once you know your printers, you can connect to them in one of two ways:
 
-Using SDCPDiscovery:
+Using SDCPDiscovery. This will handle the correct SDCPPrinter type for you and return an object you can use.
 ```js
 SDCP.SDCPDiscovery.Connect("10.1.1.113").then((Printer)=>
 {
 	console.log(Printer);
 });
 ```
-or creating your own SDCPPrinter:
+You can also create your own SDCPPrinter/SDCPPrinterWS/SDCPPrinterUDP (depending on protocol type):
 ```js
-var Printer = new SDCP.SDCPPrinter();
+var Printer = new SDCP.SDCPPrinterWS();
 Printer.Connect("10.1.1.113").then(()=>
 {
 	console.log(Printer);
 });
 ```
 
-Note that this can only be done to SDCP devices that are using protocol V3.0.0 (and I assume above). You will still see <V3.0.0 printers in the discovery list but they do not have a websocket port listening.
+Note that you need to use the correct SDCPPrinter type for the respective protocol version. `V3.0.0` and above should use the websocket (`SDCPPrinterWS`) class. Below `V3.0.0` should use the USB (`SDCPPrinterUDB`) class.
+
+Note that functionality is not yet parallel between the two protocols. Some functions may fail with the error **Not implemented**.
 
 ## Remembering printers
 
@@ -93,6 +95,28 @@ Printer.Connect("10.1.1.113").then(()=>
 ```
 
 It might be an idea to store the properties of the printers in some form of address-book database rather than retrieving them each time you connect.
+
+A very basic address book management system `SDCP.SDCPAddressBook` is included. An example of it's use:
+```js
+const SDCP = require('sdcp');
+const AddressBook = require('sdcp/SDCPAddressBook.js');
+
+if (!AddressBook.Printers.length)
+	SDCP.SDCPDiscovery().then(devices=>
+	{
+		AddressBook.Add(devices);
+		AddressBook.Save().catch(err=>console.log(`Error saving address book: ${err}`));
+		AddressBook.Printers.forEach(p=>
+		{
+			p.Connect().catch(err=>console.log(`Could not connect to ${p.MainboardIP}: ${err.message}`));	
+		});
+	});
+else
+	AddressBook.Printers.forEach(p=>
+	{
+		p.Connect().catch(err=>console.log(`Could not connect to ${p.MainboardIP}: ${err.message}`));
+	});
+```
 
 ## Interacting with Printers
 
@@ -141,7 +165,47 @@ Printer.Connect().then(()=>
 });
 ```
 
-#### `GetFiles (Path="usb")`
+#### `Start (File, Layer)` *(not currently supported in <V3.0.0)*
+Start printing the file `File` (beginning from layer `Layer`). Layer will default to 0.
+```js
+var Printer = new SDCP.SDCPPrinter();
+Printer.Connect("10.1.1.113").then(()=>
+{
+	Printer.Start("Testing.ctb").then(()=>
+	{
+		console.log("Print started");
+	}
+});
+```
+
+#### `Pause ()` *(not currently supported in <V3.0.0)*
+Pause the printer's current print.
+```js
+var Printer = new SDCP.SDCPPrinter();
+Printer.Connect("10.1.1.113").then(()=>
+{
+	Printer.Pause().then(()=>
+	{
+		console.log("Print paused");
+	}
+});
+```
+
+#### `Stop ()` *(not currently supported in <V3.0.0)*
+Stop the printer's current print.
+```js
+var Printer = new SDCP.SDCPPrinter();
+Printer.Connect("10.1.1.113").then(()=>
+{
+	Printer.Stop().then(()=>
+	{
+		console.log("Print stopped");
+	}
+});
+```
+
+
+#### `GetFiles (Path="usb")` *(not currently supported in <V3.0.0)*
 Retrieve a list of files from a path on the printer. Returns an array of Objects that match the spec of the API (type `0` is a folder, type `1` is a file).
 ```js
 var Printer = new SDCP.SDCPPrinter();
@@ -165,7 +229,7 @@ Printer.Connect("10.1.1.113").then(()=>
 ]
 ```
 
-#### `DeleteFilesFolders (Files, Folders)`
+#### `DeleteFilesFolders (Files, Folders)` *(not currently supported in <V3.0.0)*
 Delete a provided selection of files or folders. Files/folders can be `undefined` (don't delete any of that type), a single entry `"test.ctb"` or an array `["folder", "folder"]`.
 ```js
 Printer.Connect().then(()=>
@@ -180,7 +244,7 @@ Printer.Connect().then(()=>
 });
 ```
 
-#### `DeleteFiles (Files)`
+#### `DeleteFiles (Files)` *(not currently supported in <V3.0.0)*
 Identical to the previous function, though purely for deleting files.
 ```js
 Printer.Connect().then(()=>
@@ -195,7 +259,7 @@ Printer.Connect().then(()=>
 });
 ```
 
-#### `GetHistoricalTasks (Expand=false)`
+#### `GetHistoricalTasks (Expand=false)` *(not currently supported in <V3.0.0)*
 Retrieve a historical list of tasks from the printer based on what it has printed. If `Expand` is false it will return a list of task-id strings. If `Expand` is true it returns an object of tasks (each taskId is a key)
 ```js
 Printer.Connect().then(()=>
@@ -254,12 +318,12 @@ Printer.Connect().then(()=>
 }		
 ```
 
-#### `GetHistoricalTaskDetails (TaskId)`
+#### `GetHistoricalTaskDetails (TaskId)` *(not currently supported in <V3.0.0)*
 Similar to above, but will retrieve the full details of a single (or multiple) tasks based on the ids. TaskId can be a `string` or an array of `string`s.
 ```js
 Printer.Connect().then(()=>
 {
-	Printer.GetHistoricalTaskDetails(['1bb70506-4ad7-11ef-90e7-34a6ef373773').then((task)=>
+	Printer.GetHistoricalTaskDetails('1bb70506-4ad7-11ef-90e7-34a6ef373773').then((task)=>
 	{
 		console.log(task);	//Returns a single object
 	});
@@ -271,7 +335,7 @@ Printer.Connect().then(()=>
 ```
 )
 
-#### `SetTimelapse (Enabled)`
+#### `SetTimelapse (Enabled)` *(not currently supported in <V3.0.0)*
 Toggle the timelapse feature on and off
 ```js
 Printer.Connect().then(()=>
@@ -283,7 +347,7 @@ Printer.Connect().then(()=>
 });
 ```
 
-#### `SetVideoStream (Enabled)`
+#### `SetVideoStream (Enabled)` *(not currently supported in <V3.0.0)*
 Toggle the video-stream feature on and off. If turned on, it will return the URL of the RTSP videostream. Most devices will have a limit for how many streams can be active. I have not investigated this enough to know how it works.
 ```js
 Printer.Connect().then(()=>
@@ -299,7 +363,7 @@ Printer.Connect().then(()=>
 ## File uploading
 Files can be uploaded using `SDCPPrinter.Upload()`
 
-#### `Upload (File, [Options])`
+#### `Upload (File, [Options])` *(not currently supported in <V3.0.0)*
 `File` points to a local file, `Options` can be used to enable/disable verification or have a progress callback called each chunk:
 ```js
 Printer.Connect().then(()=>
@@ -307,7 +371,7 @@ Printer.Connect().then(()=>
 	Printer.Upload("C:\\Flame_Defender_Bust_2_2024_0522_2328.ctb", 
 	{
 		//Called pre-upload and every 1mb uploaded
-		progresscallback: (progress)=>
+		ProgressCallback: (progress)=>
 		{
 			console.log(progress);
 		}
@@ -374,7 +438,18 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 
 **Be careful** when sending custom commands. I have crashed my printer by sending unexpected data.
 
-## TBD
+---
+
+## Updates
+
+#### 0.4.0
+- Initial support for older V1.0.0 UDP based models (Mars 4 Ultra etc.)
+- Various tweaks and fixes
+
+#### 0.3.7
+- `Start`, `Pause` and `Stop` function wrappers added to `SDCPPrinter` class,
+- Various tweaks and fixes
+
+#### Working on
 - Built in camera stream/screenshot handling
 - Wrappers for timelapse downloading
-- An example that pulls it all together and shows how to use everything

@@ -1,5 +1,8 @@
 const fs = require("fs");
-const SDCPPrinter = require("./SDCPPrinter");
+const SDCPDiscovery  = require("./SDCPDiscovery");
+const SDCPPrinter    = require("./SDCPPrinter");
+const SDCPPrinterWS  = require("./SDCPPrinterWS");
+const SDCPPrinterUDP = require("./SDCPPrinterUDP");
 const debug = false;
 
 class SDCPAddressBook 
@@ -74,7 +77,11 @@ class SDCPAddressBook
 		{
 			var data = fs.readFileSync(this.#addressBookFile);
 			var Entries = JSON.parse(data);
-			Entries.forEach(e=>this.Add(new SDCPPrinter(e)));
+			Entries.forEach(e=>
+			{
+				var PrinterType = SDCPDiscovery.PrinterType(e);
+				this.Add(new PrinterType(e));
+			});
 
 			console.log(`Loaded address book (${this.#AddressBook.length} entries) from ${this.#addressBookFile}`);
 			return true;
@@ -95,7 +102,11 @@ class SDCPAddressBook
 		{
 			if (err) return typeof Callback === "function" ? Callback(err) : undefined;
 			var Entries = JSON.parse(data);
-			this.#AddressBook = Entries.map(e=>new SDCPPrinter(e));
+			this.#AddressBook = Entries.map(e=>
+			{
+				var PrinterType = SDCPDiscovery.PrinterType(e);
+				return newPrinterType(e)
+			});
 			console.log(`Loaded address book (${this.#AddressBook.length} entries) from ${this.#addressBookFile}`);
 			if (typeof Callback === "function") 
 				Callback();
