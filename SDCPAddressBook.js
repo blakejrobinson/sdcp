@@ -1,8 +1,6 @@
 const fs = require("fs");
 const SDCPDiscovery  = require("./SDCPDiscovery");
 const SDCPPrinter    = require("./SDCPPrinter");
-const SDCPPrinterWS  = require("./SDCPPrinterWS");
-const SDCPPrinterUDP = require("./SDCPPrinterUDP");
 const debug = false;
 
 class SDCPAddressBook 

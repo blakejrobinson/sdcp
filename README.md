@@ -443,8 +443,13 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 
 ## Updates
 
+#### 0.4.5
+- Further support for older V1.0.0 MQTT based models (Mars 4 Ultra etc.),
+- Built in MQTT server and `SDCPPrinterMQTT` class to allow for V1.0.0 connection,
+- File upload on v1.0.0 (requires HTTP server)
+
 #### 0.4.1
-- Initial support for older V1.0.0 UDP based models (Mars 4 Ultra etc.),
+- Initial support for older V1.0.0 UDP based models
 - Address book handling class,
 - SDCPDiscovery options provides callback for each printer found,
 - Various tweaks and fixes

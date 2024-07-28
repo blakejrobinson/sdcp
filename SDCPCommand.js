@@ -105,6 +105,31 @@ class SDCPCommandRename extends SDCPCommand
 	}
 }
 
+class SDCPCommandFileUpload extends SDCPCommand
+{
+	/** 
+	 * Start printing a file
+	 * @param {string} [Path] - The path to file
+	 * @param {number} [Size] - The size of the file
+	 * @param {string} [Hash] - The hash of the file
+	 * @param {string} [URL] - The URL of the file
+	 * 
+	 */
+	constructor(Path, Size, Hash, URL)
+	{
+		super();
+		this.Data.Cmd = 256;
+		this.Data.Data = {
+            Check: 		0,
+            CleanCache: 1,
+            Compress: 	0,
+            FileSize: 	Size,
+            Filename: 	Path,
+            MD5: 		Hash,
+            URL: 		'http://${ipaddr}:3000/' + URL
+        };
+	}
+}
 class SDCPCommandFileList extends SDCPCommand
 {
 	/** 
@@ -207,5 +232,6 @@ module.exports =
 	SDCPCommandHistoricalTasks,
 	SDCPCommandTaskDetails,
 	SDCPCommandVideoStream,
-	SDCPCommandTimelapse	
+	SDCPCommandTimelapse,
+	SDCPCommandFileUpload
 };

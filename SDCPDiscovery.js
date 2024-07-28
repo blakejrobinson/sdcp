@@ -108,8 +108,9 @@ function SDCPConnect(MainboardIP, PrinterType, Callback)
 	}).catch((err) => Callback(err));
 }
 
-const SDCPPrinterUDP = require('./SDCPPrinterUDP.js');
-const SDCPPrinterWS  = require('./SDCPPrinterWS.js');
+const SDCPPrinterUDP  = require('./SDCPPrinterUDP.js');
+const SDCPPrinterMQTT = require('./SDCPPrinterMQTT.js');
+const SDCPPrinterWS   = require('./SDCPPrinterWS.js');
 /**
  * Return the correct printer handler to use
  * @param {Object} about 
@@ -118,7 +119,7 @@ const SDCPPrinterWS  = require('./SDCPPrinterWS.js');
 function PrinterType(about)
 {
 	if (about && about.ProtocolVersion === "V3.0.0") return SDCPPrinterWS;
-	if (about && about.ProtocolVersion === "V1.0.0") return SDCPPrinterUDP;
+	if (about && about.ProtocolVersion === "V1.0.0") return SDCPPrinterMQTT;
 	return SDCPPrinter;
 }
 
