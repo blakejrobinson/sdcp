@@ -7,7 +7,7 @@ const debug = false;
 
 /**
  * Discover SDCP devices on the network
- * @param {{timeout: number, connect: bool}|number} [Options] - Options for the discovery process or timeout value
+ * @param {{timeout: number, connect: bool, cbperprinter: bool}|number} [Options] - Options for the discovery process or timeout value
  * @param {function(Error?, SDCPPrinter[]): void} [Callback] - Callback function to be called when the discovery process is complete
  * @returns {Promise<SDCPPrinter[]>} - Promise that resolves with an array of SDCPPrinter objects
 */
@@ -21,7 +21,7 @@ function SDCPDiscovery(Options, Callback)
 
 	//No callback? Handle this as a promise
 	if (!Callback)
-		return new Promise((resolve,reject) => {SDCPDiscovery((err,devices) => {if (err) return reject(err); resolve(devices);});});
+		return new Promise((resolve,reject) => {SDCPDiscovery(Options, (err,devices) => {if (err) return reject(err); resolve(devices);});});
 
 	const client = dgram.createSocket('udp4');
 	const broadcastAddress = '255.255.255.255';
@@ -33,7 +33,7 @@ function SDCPDiscovery(Options, Callback)
 	{
 		if (debug) console.log('Discovery process complete');
 		if (client) client.close();
-		if (typeof Callback === "function") 
+		if (typeof Callback === "function")
 			Callback(undefined, Devices);
 
 		//Now connect the printers
@@ -70,6 +70,8 @@ function SDCPDiscovery(Options, Callback)
 		if (PrinterInfo.Data.Attributes) PrinterInfo.Data.Attributes.Id = PrinterInfo.Id;
 		var PrinterType = SDCPDiscovery.PrinterType(PrinterInfo.Data && PrinterInfo.Data.Attributes ? PrinterInfo.Data.Attributes : PrinterInfo.Data);
 		Devices.push(new PrinterType(PrinterInfo.Data && PrinterInfo.Data.Attributes ? PrinterInfo.Data.Attributes : PrinterInfo.Data ? PrinterInfo.Data : PrinterInfo));
+		if (typeof Options.callback === "function")
+			Options.callback(Devices[Devices.length-1]);
 	});
 
 	if (debug) console.log('Broadcasting discovery message...');

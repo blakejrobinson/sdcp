@@ -27,8 +27,9 @@ SDCP.SDCPDiscovery().then((devices) =>
 `SDCPDiscovery` can take an optional object parameter:
 ```js
 {
-	timeout: {number=1000} 		//The amount of time to wait for all printers to reply
-	connect: {boolean=false}	//If set to true, discover will also connect to all V3.0.0+ printers
+	timeout: {number=1000} 			//The amount of time to wait for all printers to reply
+	connect: {boolean=false}		//If set to true, discover will also connect to all V3.0.0+ printers
+	callback: {function} 			//An optional callback that is called every time a printer is added.
 }
 ```
 
@@ -43,7 +44,7 @@ SDCP.SDCPDiscovery.Connect("10.1.1.113").then((Printer)=>
 	console.log(Printer);
 });
 ```
-You can also create your own SDCPPrinter/SDCPPrinterWS/SDCPPrinterUDP (depending on protocol type):
+You can also create your own SDCPPrinterWS/SDCPPrinterUDP (depending on protocol type):
 ```js
 var Printer = new SDCP.SDCPPrinterWS();
 Printer.Connect("10.1.1.113").then(()=>
@@ -62,7 +63,7 @@ Note that if the printer properties are not supplied on SDCPPrinter's constructi
 
 You can provide the full details of a printer in the constructor:
 ```js
-var Printer = new SDCP.SDCPPrinter({
+var Printer = new SDCP.SDCPPrinterWS({
 	Id: "{id}",
 	Name: "Saturn 4 Ultra",
 	MachineName: "Saturn 4 Ultra",
@@ -75,7 +76,7 @@ var Printer = new SDCP.SDCPPrinter({
 ```
 or you can retrieve this information from an existing SDCPPrinter (made via Discovery or Connect)
 ```js
-var Printer = new SDCP.SDCPPrinter();
+var Printer = new SDCP.SDCPPrinterWS();
 Printer.Connect("10.1.1.113").then(()=>
 {
 	var PrinterDetails = Printer.toJSON();
@@ -141,8 +142,8 @@ Printer.Connect().then(()=>
 
 The following commands are also wrapped up by the SDCPPrinter class:
 
-#### `GetStatus ()`
-Get the current status of the printer
+#### `GetStatus ([Cache=false])`
+Get the current status of the printer. If `cache` is true, uses the last unsolicited cached status.
 ```js
 Printer.Connect().then(()=>
 {
@@ -153,8 +154,8 @@ Printer.Connect().then(()=>
 });
 ```
 
-#### `GetAttributes ()`
-Get the current attributes of the printer
+#### `GetAttributes ([Cache=false])`
+Get the current attributes of the printer. If `cache` is true, uses the last unsolicited cached attributes.
 ```js
 Printer.Connect().then(()=>
 {
@@ -442,8 +443,10 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 
 ## Updates
 
-#### 0.4.0
-- Initial support for older V1.0.0 UDP based models (Mars 4 Ultra etc.)
+#### 0.4.1
+- Initial support for older V1.0.0 UDP based models (Mars 4 Ultra etc.),
+- Address book handling class,
+- SDCPDiscovery options provides callback for each printer found,
 - Various tweaks and fixes
 
 #### 0.3.7
@@ -451,6 +454,5 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 - Various tweaks and fixes
 
 #### Working on
-- MQTT support for more commands on older protocol versions,
-- Built in camera stream/screenshot handling,
+- Built in camera stream/screenshot handling
 - Wrappers for timelapse downloading
