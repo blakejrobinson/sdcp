@@ -451,5 +451,6 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 - Various tweaks and fixes
 
 #### Working on
-- Built in camera stream/screenshot handling
+- MQTT support for more commands on older protocol versions,
+- Built in camera stream/screenshot handling,
 - Wrappers for timelapse downloading
