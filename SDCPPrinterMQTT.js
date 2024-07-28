@@ -392,7 +392,7 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 	/**
 	 * Upload a file to the printer
 	 * @param {string} File - The path to the file to upload
-	 * @param {{Verification: boolean, ProgressCallback: function(Progress): void}} Options - The options to use
+	 * @param {{URL: string, Verification: boolean, ProgressCallback: function(Progress): void}} Options - The options to use
 	 * @param {function(Error?, Object): void} [Callback] - Callback function to be called when the command is complete
 	 * @returns {Promise<Object>} - Promise that resolves with the response from the printer
 	 */
@@ -403,7 +403,7 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 		if (Callback === undefined) 
 			return new Promise((resolve,reject) => {this.UploadFile(File, Options, (err,response) => {if (err) return reject(err); resolve(response);});});
 
-		const { Verification: verification = true, ProgressCallback: progressCallback } = Options;
+		const { Verification, ProgressCallback } = Options;
 		const fileStats = await fs.promises.stat(File);
 		const totalSize = fileStats.size;
 		const uuid = crypto.randomBytes(32).toString('hex');
@@ -416,41 +416,47 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 		//Track the upload!
 		var FollowUpload = function(update)
 		{
+			//console.log(JSON.stringify(update, undefined, "\t"));
 			try
 			{
 				var UploadInfo = update.Data.Status.FileTransferInfo;
-				if (debug) console.log(UploadInfo);
+				if (debug) 
+					console.log(UploadInfo);
 
 				//It failed?
-				if (UploadInfo.Status === 3)
+				if (update.Data.Status.CurrentStatus === 0 && UploadInfo.Status === 3)
 				{
 					MQTTServerInstance.off(`/sdcp/status/${this.MainboardID}`, FollowUpload);
-					return Callback(new Error('Upload failed'), {...UploadInfo, Uuid: uuid, Result: false});
+					//this.SendCommand(new SDCPCommand.SDCPCommandTimeperiod(5000));
+					ProgressCallback({Status: "Complete", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Complete: 1, Success: false, Result: UploadInfo});
+					return Callback(new Error('Upload failed'), {Status: "Complete", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Complete: 1, Success: false, Result: UploadInfo});
 				}
 				//It success?
-				if (UploadInfo.Status === 2)
+				if (update.Data.Status.CurrentStatus === 0 && UploadInfo.Status === 2)
 				{
 					MQTTServerInstance.off(`/sdcp/status/${this.MainboardID}`, FollowUpload);
-					return Callback(undefined, {...UploadInfo, Uuid: uuid, Result: true});
+					//this.SendCommand(new SDCPCommand.SDCPCommandTimeperiod(5000));
+					ProgressCallback({Status: "Complete", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Success: true, Complete: 1, Result: UploadInfo});
+					return Callback(undefined, {Status: "Complete", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Success: true, Complete: 1, Result: UploadInfo});
 				}
 
 				//Update the progress
-				if (typeof progressCallback === 'function') 
-					progressCallback({...UploadInfo, Uuid: uuid, Complete: UploadInfo.DownloadOffset / UploadInfo.FileTotalSize});
+				if (update.Data.Status.CurrentStatus === 2)
+				{
+					if (typeof ProgressCallback === 'function') 
+						ProgressCallback({Status: "Uploading", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Complete: UploadInfo.DownloadOffset / UploadInfo.FileTotalSize});
+				}
 			}
 			catch (e)
 			{
-				
+				if (debug)
+					console.log(e);
 			}
 		}.bind(this);
 		MQTTServerInstance.on(`/sdcp/status/${this.MainboardID}`, FollowUpload);
 
-		this.SendCommand(new SDCPCommand.SDCPCommandFileUpload(filename, totalSize, fileMD5, Options && Options.URL ? Options.URL : fileMD5 + ".ctb")).then((response) =>
-		{
-			//if (response.Data && response.Data.Data && response.Data.Data.Ack !== 0)
-			//	return Callback(new Error('Error getting status'));
-			//Callback(undefined, response.Status);
-		}).catch(err=>Callback(err));
+		//await this.SendCommand(new SDCPCommand.SDCPCommandTimeperiod(250));
+		await this.SendCommand(new SDCPCommand.SDCPCommandFileUpload(filename, totalSize, fileMD5, Options && Options.URL ? Options.URL : fileMD5 + ".ctb"));		
 	}	
 }
 

@@ -126,7 +126,7 @@ class SDCPCommandFileUpload extends SDCPCommand
             FileSize: 	Size,
             Filename: 	Path,
             MD5: 		Hash,
-            URL: 		'http://${ipaddr}:3000/' + URL
+            URL: 		URL.toLowerCase().startsWith('http') ? URL : 'http://${ipaddr}:3000/' + URL
         };
 	}
 }
@@ -217,6 +217,20 @@ class SDCPCommandTimelapse extends SDCPCommand
 	}
 }
 
+class SDCPCommandTimeperiod extends SDCPCommand
+{
+	/**
+	 * Toggle whether timelapse is enabled
+	 * @param {number} TimePeriod - The time period in milliseconds
+	 */
+	constructor(TimePeriod=5000)
+	{
+		super();
+		this.Data.Cmd = 512;
+		this.Data.Data = {TimePeriod: TimePeriod};
+	}
+}
+
 module.exports =
 {
 	SDCPCommand,
@@ -233,5 +247,6 @@ module.exports =
 	SDCPCommandTaskDetails,
 	SDCPCommandVideoStream,
 	SDCPCommandTimelapse,
-	SDCPCommandFileUpload
+	SDCPCommandFileUpload,
+	SDCPCommandTimeperiod
 };

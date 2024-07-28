@@ -362,14 +362,14 @@ Printer.Connect().then(()=>
 #### At some point I'll be fully implementing this inside SDCP
 
 ## File uploading
-Files can be uploaded using `SDCPPrinter.Upload()`
+Files can be uploaded using `SDCPPrinter.UploadFile()`
 
-#### `Upload (File, [Options])` *(not currently supported in <V3.0.0)*
+#### `UploadFile (File, [Options])` *(not currently supported in <V3.0.0)*
 `File` points to a local file, `Options` can be used to enable/disable verification or have a progress callback called each chunk:
 ```js
 Printer.Connect().then(()=>
 {
-	Printer.Upload("C:\\Flame_Defender_Bust_2_2024_0522_2328.ctb", 
+	Printer.UploadFile("C:\\Flame_Defender_Bust_2_2024_0522_2328.ctb", 
 	{
 		//Called pre-upload and every 1mb uploaded
 		ProgressCallback: (progress)=>
@@ -392,9 +392,38 @@ Printer.Connect().then(()=>
 `Options` currently supports:
 ```js
 {
-	verification:     {boolean} 			//Whether to verify the upload
-	progresscallback: {function(progress)}	//A callback that's called every 1mb
+	Verification:     {boolean} 			//Whether to verify the upload
+	Progresscallback: {function(progress)}	//A callback that's called every 1mb
+	URL: 			  {string}				//The URL of the download (MQTT printers)
 }
+```
+
+### MQTT uploading
+MQTT printer clients upload in a slightly different method. They require the file to be hosted on an HTTP webserver. Here's an example (using Express running on port 3000):
+```js
+//Setart an express server
+const express = require('express');
+var app = express();
+app.use((req, res)=>res.setHeader('Content-Disposition', 'attachment; filename=test').sendFile(path.join(__dirname, "test.ctb")));
+app.listen(3000, ()=>{});
+
+//Connect and request download
+Printer.Connect().then(()=>
+{
+	Printer.UploadFile("C:\\Flame_Defender_Bust_2_2024_0522_2328.ctb", 
+	{
+		//URL (the printer replaces ${ipaddr} with the MQTT server ip)
+		//It also seems to
+		URL: "http://${ipaddr}:3000/${70ba9d56f679c0eaa64e29c70e907074.ctb",
+		ProgressCallback: (progress)=>
+		{
+			console.log(progress);
+		}
+	}).then((result)=>
+	{
+		console.log(result);
+	});
+});
 ```
 
 ## Custom commands and handling
@@ -443,10 +472,12 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 
 ## Updates
 
-#### 0.4.5
+#### 0.4.7
+- UploadFile callbacks made consistent between MQTT and WS SDCPPrinters,
 - Further support for older V1.0.0 MQTT based models (Mars 4 Ultra etc.),
 - Built in MQTT server and `SDCPPrinterMQTT` class to allow for V1.0.0 connection,
 - File upload on v1.0.0 (requires HTTP server)
+- Various tweaks and fixes
 
 #### 0.4.1
 - Initial support for older V1.0.0 UDP based models

@@ -261,6 +261,122 @@ class SDCPPrinterWS extends require("./SDCPPrinter")
 		if (debug) console.log(JSON.parse(JSON.stringify(Command), undefined, "\t"));
 	}
 
+	/**
+	 * Calculate MD5 hash of a file
+	 * @param {string} filePath - Path to the file
+	 * @returns {Promise<string>} - MD5 hash of the file
+	 */
+	async #calculateFileMD5(filePath) 
+	{
+		return new Promise((resolve, reject) => 
+		{
+			const hash = crypto.createHash('md5');
+			const stream = fs.createReadStream(filePath);
+			stream.on('data', (data) => hash.update(data));
+			stream.on('end', () => resolve(hash.digest('hex')));
+			stream.on('error', reject);
+		});
+	}
+		
+	/**
+	 * Upload a file to the printer
+	 * @param {string} File - The path to the file to upload
+	 * @param {{Verification: boolean, ProgressCallback: function(Progress): void}} Options - The options to use
+	 * @param {function(Error?, Object): void} [Callback] - Callback function to be called when the command is complete
+	 * @returns {Promise<Object>} - Promise that resolves with the response from the printer
+	 */
+	async UploadFile(File, Options, Callback)
+	{
+		if (typeof Options === 'function') {Callback = Options; Options = {};}
+		if (Options === undefined) Options = {};
+		if (Callback === undefined) 
+			return new Promise((resolve,reject) => {this.UploadFile(File, Options, (err,response) => {if (err) return reject(err); resolve(response);});});
+
+		const { Verification = true, ProgressCallback } = Options;
+		const fileStats = await fs.promises.stat(File);
+		const totalSize = fileStats.size;
+		const chunkSize = 1024 * 1024; // 1MB chunks
+		const uuid = crypto.randomBytes(32).toString('hex');
+
+		let uploadedSize = 0;
+		let md5Hash = crypto.createHash('md5');
+		let Result = undefined;
+		let filename = path.basename(File);
+		const fileMD5 = await this.#calculateFileMD5(File);
+
+		if (typeof ProgressCallback === 'function') 
+			ProgressCallback({Status: "Preparing",
+						"S-File-MD5": fileMD5,
+						Uuid: uuid,
+						Offset: uploadedSize,
+						TotalSize: totalSize,
+						Complete: uploadedSize / totalSize,
+						File: filename});
+
+		const fileHandle = await fs.promises.open(File, 'r');
+		try 
+		{
+			while (uploadedSize < totalSize) 
+			{
+				const buffer = Buffer.alloc(chunkSize);
+				const { bytesRead } = await fileHandle.read(buffer, 0, chunkSize, uploadedSize);
+				if (bytesRead === 0) break;			
+			
+				const chunk = buffer.slice(0, bytesRead);
+				md5Hash.update(chunk);
+
+				const formData = new FormData();
+				formData.append('Uuid', uuid);
+				formData.append('Offset', uploadedSize.toString());
+				formData.append('TotalSize', totalSize.toString());
+				formData.append('Check', Verification ? '1' : '0');
+				formData.append('S-File-MD5', fileMD5);
+				formData.append('File', new Blob([chunk]), filename);//  { filename: 'chunk' });
+				
+				if (debug) console.log(`Uploading chunk of size ${chunk.length} bytes`);
+				const response = await fetch(`http://${this.MainboardIP}:3030/uploadFile/upload`, 
+				{
+					method: 'POST',
+					body: formData
+				});
+		
+				if (!response.ok) 
+				{
+					const errorData = await response.json();
+					if (debug) console.error(`Upload failed: ${JSON.stringify(errorData)}`);
+					throw new Error(`Upload failed: ${JSON.stringify(errorData)}`);
+				}
+				else 
+					Result = await response.json();
+		
+				uploadedSize += chunk.length;
+				if (typeof ProgressCallback === 'function') 
+					ProgressCallback({Status: "Uploading",
+								"S-File-MD5": fileMD5,
+								Uuid: uuid,
+								Offset: uploadedSize,
+								TotalSize: totalSize,
+								Complete: uploadedSize / totalSize,
+								File: filename});
+			}	
+
+			if (debug) console.log('File upload completed successfully');			
+		}
+		finally 
+		{
+      		await fileHandle.close();			
+    	}
+
+		Callback(undefined, {Status: "Complete",
+							 "S-File-MD5": fileMD5,
+							 Uuid: uuid,
+							 Offset: uploadedSize,
+							 TotalSize: totalSize,
+							 Complete: uploadedSize / totalSize,
+							 File: filename,
+							 Success: Result && Result.success ? true : false,
+							 Result: Result});
+	}	
 }
 
 module.exports = SDCPPrinterWS;
