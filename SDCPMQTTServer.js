@@ -513,6 +513,26 @@ class MQTTServer extends EventEmitter
 			}
 		}
 	}
+
+	/**
+	 * Disconnect a client
+	 * @param {string} id - Client ID
+	 */
+	disconnect(id)
+	{
+		var simulateDisconnect = false;
+		if (id && id.substring(0, 1) === "_")
+		{
+			id = id.substring(1);
+			simulateDisconnect = true;
+		}
+
+		this.#clients.forEach(socket => 
+		{
+			if (id === undefined || socket.clientId === id)
+				handleDisconnect(socket);
+		});
+	}
 }
 
 module.exports = MQTTServer;

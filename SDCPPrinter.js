@@ -33,6 +33,8 @@ class SDCPPrinter extends EventEmitter
 	FirmwareVersion = undefined;
 	/** Connected? */
 	Connected = false;
+	/** Always on */
+	AlwaysOn = false;
 
 	/**
 	 * Create a new SDCPPrinter instance
@@ -44,6 +46,7 @@ class SDCPPrinter extends EventEmitter
 	 * @param {string} Config.MainboardID - The ID of the printer
 	 * @param {string} Config.ProtocolVersion - The protocol version of the printer
 	 * @param {string} Config.FirmwareVersion - The firmware version of the printer
+	 * @param {boolean} Config.AlwaysOn - Whether or not connection should be automatically maintained with the printer
 	 */
 	constructor(Config) 
 	{
@@ -51,6 +54,9 @@ class SDCPPrinter extends EventEmitter
 		if (typeof Config === 'string') Config = {MainboardIP: Config};
 		if (typeof Config !== 'object') Config = {};
 		for (var key in Config) this[key] = Config[key];
+
+		if (this.AlwaysOn) 
+			this.SetupAlwaysOn();
 	}
 
 	/**
@@ -140,59 +146,6 @@ class SDCPPrinter extends EventEmitter
 			}
 		});
 	}
-
-	/**
-	 * @param {string} [MainboardIP] - The IP address of the printer to connect to. If left blank it will use the MainboardIP property
-	 * @param {Object|number} [Options] - Options for the mqqt (number is the timeout)
-	 * @param {function(Error?): void} [Callback] - Callback function to be called when the connection is established
-	 * @returns {Promise<void>} - Promise that resolves when the connection is established
-	 */	
-	RequestMQTT(MainboardIP, Options, Callback)
-	{
-		if (typeof Options === 'function') {Callback = Options; Options = undefined;}
-		if (typeof Options === 'number') Options = {timeout: Options};
-		if (Options === undefined) Options = {};
-
-		if (Callback === undefined)
-			return new Promise((resolve,reject) => {this.Broadcast(MainboardIP, Options, (err, Results) => {if (err) return reject(err); resolve(Results);});});
-
-		if (typeof MainboardIP === 'function') {Callback = MainboardIP; MainboardIP = undefined;}
-		if (MainboardIP === undefined) MainboardIP = this.MainboardIP;
-		if (MainboardIP === undefined)
-			return Callback(new Error('No IP address provided'));
-
-		var timeoutWatch = undefined, timedOut = false;
-		if (Options.timeout !== undefined)
-		{
-			timeoutWatch = setTimeout(() =>
-			{
-				return Callback(new Error('Timeout'));
-				timedOut = true;
-			}, Options.timeout);
-		}
-
-		const client = dgram.createSocket('udp4');
-		const discoveryMessage = 'M66666 1883';
-		
-		client.bind(() => client.setBroadcast(true));
-		client.on('message', (msg, rinfo) => 
-		{
-			client.close();
-		});
-	
-		if (debug) console.log('Broadcasting mqtt connect message...');
-		client.send(discoveryMessage, 3000, MainboardIP, (err) => 
-		{
-			if (err) 
-			{
-				if (debug) console.error('    Error MQTT connect message:', err);
-			}
-			else
-			{
-				if (debug) console.log('    MQTT connect message broadcast successfully');
-			}
-		});
-	}	
 
 	/**
 	 * Send a command to the printer
@@ -472,6 +425,11 @@ class SDCPPrinter extends EventEmitter
 			Callback(undefined, response && response.Data && response.Data.Data ? response.Data.Data.VideoUrl : undefined);
 		}).catch(err=>Callback(err));
 	}
+
+	/**
+	 * Set up the printer to always be connected
+	 */
+	SetupAlwaysOn() { return; }
 
 	/**
 	 * JSON representation of the printer

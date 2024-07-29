@@ -11,6 +11,8 @@ class SDCPAddressBook
 	#AddressBook = [];	
 	/** Is exiting already */
 	#exiting = false;
+	/** Always online state */
+	AlwaysOn = true;
 	
 	/** Amount of entries in the address book */
 	get length() {return this.#AddressBook.length;}
@@ -44,7 +46,7 @@ class SDCPAddressBook
 		console.log(`Saving address book (${this.#AddressBook.length} entries) to ${this.#addressBookFile}`);
 
 		var Entries = this.#AddressBook.map(e=>e.toJSON());
-		fs.writeFile(this.#addressBookFile, JSON.stringify(Entries), (err) => 
+		fs.writeFile(this.#addressBookFile, JSON.stringify(Entries, undefined, "\t"), (err) => 
 		{
 			if (err) return typeof Callback === "function" ? Callback(err) : undefined;
 			if (typeof Callback === "function") 
@@ -61,7 +63,7 @@ class SDCPAddressBook
 		console.log(`Saving address book (${this.#AddressBook.length} entries) to ${this.#addressBookFile}`);
 
 		var Entries = this.#AddressBook.map(e=>e.toJSON());
-		fs.writeFileSync(this.#addressBookFile, JSON.stringify(Entries));
+		fs.writeFileSync(this.#addressBookFile, JSON.stringify(Entries, undefined, "\t"));
 		return true;
 	}
 
@@ -77,8 +79,9 @@ class SDCPAddressBook
 			var Entries = JSON.parse(data);
 			Entries.forEach(e=>
 			{
+				/** SDCPPrinter.constructor */
 				var PrinterType = SDCPDiscovery.PrinterType(e);
-				this.Add(new PrinterType(e));
+				this.Add(new PrinterType({...e, AlwaysOn: this.AlwaysOn}));
 			});
 
 			console.log(`Loaded address book (${this.#AddressBook.length} entries) from ${this.#addressBookFile}`);
@@ -103,7 +106,7 @@ class SDCPAddressBook
 			this.#AddressBook = Entries.map(e=>
 			{
 				var PrinterType = SDCPDiscovery.PrinterType(e);
-				return newPrinterType(e)
+				return newPrinterType({...e, AlwaysOn: this.AlwaysOn})
 			});
 			console.log(`Loaded address book (${this.#AddressBook.length} entries) from ${this.#addressBookFile}`);
 			if (typeof Callback === "function") 

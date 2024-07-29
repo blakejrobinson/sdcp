@@ -123,6 +123,8 @@ else
 
 Printers are event emiters and will emit the following events:
 - `connected` - When connected to the printer
+- `disconnected` - When disconnected from the printer
+- `reconnected` - When reconnected to the printer (`connect` is also sent)
 - `notice` - when there is a notice
 - `error` - When there is an unsolicited error
 - `status` - When an unsolicted status update is received
@@ -469,9 +471,20 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 
 **Be careful** when sending custom commands. I have crashed my printer by sending unexpected data.
 
+## Always on connections
+Both `SDCPPrinterWS` and `SDCPPrinterMQTT` have support for for 'always on' connections. Simply set the `Autoconnect` property to `true` (or a `number` indicating how long in Ms to wait between retries).
+```js
+Printer.Autoconnect = true;		//Auto re-connect
+Printer.Autoconnect = 5000;		//Auto re-connect every 5 seconds
+```
+
 ---
 
 ## Updates
+
+#### 0.4.9 ####
+- Improved autoconnect feature for MQTT and WS SDCPPrinters. Autoconnect is now off by default
+- Various tweaks and fixes
 
 #### 0.4.8 ####
 - Changed UDP, MQTT and WS GetStatus to be consistent. Sorry for the structure change but this'll make it much easier in the long run ~_~

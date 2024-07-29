@@ -3,9 +3,9 @@ const SDCPCommand  = require('./SDCPCommand');
 const fs = require('fs');
 const crypto = require('crypto');
 const path = require('path');
+const dgram = require('dgram');
 
 const debug = false;
-const UDP_UPDATE_RATE = 500;		//ms
 const KEEP_CONSISTENT = true;
 
 const MQTTServer = require('./SDCPMQTTServer');
@@ -19,6 +19,10 @@ var MQTTServerInstance = undefined;
  */
 class SDCPPrinterMQTT extends require("./SDCPPrinter")
 {
+	/** Whether or not it should try to autoreconnect */
+	#AutoReconnect = false;
+	/** Time between reconnect attempts */
+	#ReconnectInterval = 5000;	
 	/** Request queue */
 	#Requests = [];
 	/** Route statuses (FIFO queue) */
@@ -29,6 +33,23 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 	#LastStatus = undefined;
 	/** Last received attributes cache	 */
 	#LastAttributes = undefined;
+
+	/** 
+	 * Set up autoreconnect
+	 * @param {boolean|number} value - Whether or not to autoreconnect. If a number is provided it will be the time between reconnect attempts
+	 * @returns {void}
+	 */
+	set AutoReconnect(value) 
+	{
+		if (value === false  || value === true)
+			this.#AutoReconnect = value;
+		else if (typeof value === 'number')
+		{
+			this.#ReconnectInterval = value;
+			this.#AutoReconnect = true;
+		}
+	}
+	get AutoReconnect() {return this.#AutoReconnect;}
 
 	/**
 	 * Connect to the printer
@@ -72,7 +93,17 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 		MQTTServerInstance.on(`connect_${this.MainboardID}`, 	(socket)   => 
 		{
 			this.Connected = true;	
-			this.emit('connected');
+			this.emit('connected', { ip: socket.remoteAddress, port: socket.remotePort, reconnect: this.Reconnecting === true});
+			if (this.Reconnecting)
+			{
+				delete this.Reconnecting;
+				this.emit('reconnected');
+			}
+			if (this.timeoutWatch)
+			{
+				clearTimeout(this.timeoutWatch);
+				delete this.timeout
+			}
 			MQTTServerInstance.subscribeToTopic(socket, `/sdcp/response/${this.MainboardID}`);
 			MQTTServerInstance.subscribeToTopic(socket, `/sdcp/request/${this.MainboardID}`);
 
@@ -83,13 +114,25 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 		});
 		MQTTServerInstance.on(`disconnect_${this.MainboardID}`, (id)   => 
 		{
-			this.Connected = false;	
-			this.emit('disconnected');
-			MQTTServerInstance.off(`connect_${this.MainboardID}`);
-			MQTTServerInstance.off(`disconnect_${this.MainboardID}`);
-			MQTTServerInstance.off(`/sdcp/status/${this.MainboardID}`);
-			MQTTServerInstance.off(`/sdcp/attributes/${this.MainboardID}`);
-			MQTTServerInstance.off(`/sdcp/response/${this.MainboardID}`);
+			if (this.Connected)
+			{
+				this.Connected = false;	
+				this.emit('disconnected');
+			}
+
+			MQTTServerInstance.removeAllListeners(`connect_${this.MainboardID}`         );
+			MQTTServerInstance.removeAllListeners(`disconnect_${this.MainboardID}`      );
+			MQTTServerInstance.removeAllListeners(`/sdcp/status/${this.MainboardID}`    );
+			MQTTServerInstance.removeAllListeners(`/sdcp/attributes/${this.MainboardID}`);
+			MQTTServerInstance.removeAllListeners(`/sdcp/response/${this.MainboardID}`  );
+
+			//Should we try to reconnect?
+			if (this.#AutoReconnect !== false)
+			{
+				this.Reconnecting = this.Reconnecting ? this.Reconnecting + 1 : 1;
+				if (debug) console.log(`Attempting to reconnect ${this.Reconnecting} in ${this.#ReconnectInterval/1000} seconds...`);				
+				setTimeout(()=>{this.Connect(MainboardIP, (err)=>{});}, this.#ReconnectInterval);
+			}
 		});
 		MQTTServerInstance.on(`/sdcp/response/${this.MainboardID}`, (Command) => 
 		{
@@ -152,13 +195,87 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 				this.#LastAttributes = {...Command.Data.Attributes, Timestamp: Command.Timestamp};
 			}
 		});
+
+		var timedOut = false;
+		if (this.timeoutWatch) 
+			clearTimeout(this.timeoutWatch);
+		this.timeoutWatch = setTimeout(() =>
+		{
+			return Callback ? Callback(new Error('Timeout')) : undefined;
+			Callback = undefined;
+			timedOut = true;
+		}, 5000);
+
+		if (debug) console.log(`Requesting ${MainboardIP} connects to MQTT...`);
 		this.RequestMQTT(MainboardIP, (err) =>
 		{
-			if (err) return Callback(err);
+			if (err && err.message === "getaddrinfo ENOTFOUND _TEST_") return;			
+			if (err)
+			{
+				if (Callback && this.#AutoReconnect === false) 
+					return Callback(err);
+				MQTTServerInstance.emit(`disconnect_${this.MainboardID}`);
+			}
 			//Callback();				
 		});			
+
+		//Simulate it already being connected for automatic reconnection tests
+		if (MainboardIP === "_TEST_")
+		{
+			MQTTServerInstance.emit(`connect_${this.MainboardID}` ,{remoteAddress: this.MainboardIP, remotePort: 3030});
+			setTimeout(() => MQTTServerInstance.emit(`disconnect_${this.MainboardID}`), 1000);
+			// this.#Websocket._socket = {remoteAddress: this.MainboardIP, remotePort: 3030};
+			// this.#Websocket.emit("open");
+			// this.#Websocket._socket = undefined;
+
+			//this.#Websocket.close();
+			Callback = undefined
+			MainboardIP = this.MainboardIP;			
+		}		
 	}
 
+	Disconnect()
+	{
+		if (MQTTServerInstance === undefined)
+			return;
+		MQTTServerInstance.disconnect(this.MainboardID);
+	}
+
+	/**
+	 * @param {string} [MainboardIP] - The IP address of the printer to connect to. If left blank it will use the MainboardIP property
+	 * @param {function(Error?): void} [Callback] - Callback function to be called when the connection is established
+	 * @returns {Promise<void>} - Promise that resolves when the connection is established
+	 */	
+	RequestMQTT(MainboardIP, Callback)
+	{		
+		if (Callback === undefined)
+			return new Promise((resolve,reject) => {this.Broadcast(MainboardIP, (err, Results) => {if (err) return reject(err); resolve(Results);});});
+
+		if (typeof MainboardIP === 'function') {Callback = MainboardIP; MainboardIP = undefined;}
+		if (MainboardIP === undefined) MainboardIP = this.MainboardIP;
+		if (MainboardIP === undefined)
+			return Callback(new Error('No IP address provided'));
+		
+		const client = dgram.createSocket('udp4');
+		const discoveryMessage = 'M66666 1883';
+		
+		client.bind(() => client.setBroadcast(true));
+		client.on('message', (msg, rinfo) => 
+		{
+			client.close();
+		});
+	
+		if (debug) console.log('Broadcasting mqtt connect message...');
+		client.send(discoveryMessage, 3000, MainboardIP, (err) => 
+		{
+			if (Callback)
+			{
+				if (err) return Callback(err);
+				Callback();
+			}
+		});
+	}	
+		
 	/**
 	 * Calculate MD5 hash of a file
 	 * @param {string} filePath - Path to the file
