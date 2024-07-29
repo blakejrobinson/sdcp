@@ -7,7 +7,7 @@ const debug = false;
 
 /**
  * Discover SDCP devices on the network
- * @param {{timeout: number, connect: bool, cbperprinter: bool}|number} [Options] - Options for the discovery process or timeout value
+ * @param {{timeout: number, connect: bool, callback: function}|number} [Options] - Options for the discovery process or timeout value
  * @param {function(Error?, SDCPPrinter[]): void} [Callback] - Callback function to be called when the discovery process is complete
  * @returns {Promise<SDCPPrinter[]>} - Promise that resolves with an array of SDCPPrinter objects
 */

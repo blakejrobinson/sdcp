@@ -116,7 +116,7 @@ class SDCPPrinterWS extends require("./SDCPPrinter")
 					}
 					else
 						this.#LastStatus = {...Command.Status, Timestamp: Command.Timestamp};
-					this.emit('status', Command);
+					this.emit('status', Command.Status);
 					return;
 				}
 				if (Command.Topic === `sdcp/attributes/${this.MainboardID}`)
@@ -129,7 +129,7 @@ class SDCPPrinterWS extends require("./SDCPPrinter")
 					}
 					else
 						this.#LastAttributes = {...Command.Attributes, Timestamp: Command.Timestamp};
-					this.emit('attributes', Command);
+					this.emit('attributes', Command.Attributes);
 					return;
 				}				
 

@@ -6,6 +6,7 @@ const path = require('path');
 
 const debug = false;
 const UDP_UPDATE_RATE = 500;		//ms
+const KEEP_CONSISTENT = true;
 
 const MQTTServer = require('./SDCPMQTTServer');
 const mqttServer = require('mqtt-server');
@@ -18,8 +19,6 @@ var MQTTServerInstance = undefined;
  */
 class SDCPPrinterMQTT extends require("./SDCPPrinter")
 {
-	/** The websocket for this printer */
-	#Websocket = undefined;
 	/** Request queue */
 	#Requests = [];
 	/** Route statuses (FIFO queue) */
@@ -128,9 +127,12 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 			}
 			else
 			{
-				if (JSON.stringify(Command) !== JSON.stringify(this.#LastStatus))
-					this.emit('status', Command);
-				this.#LastStatus = {...Command, Timestamp: Command.Timestamp};
+				//Adjust to make it match V3.0.0 for consistency
+				if (KEEP_CONSISTENT && Command && Command.Data && Command.Data.Status && Command.Data.Status.CurrentStatus !== undefined)
+					Command.Data.Status.CurrentStatus = [Command.Data.Status.CurrentStatus];
+				if (JSON.stringify(Command.Data.Status) !== JSON.stringify(this.#LastStatus))
+					this.emit('status', Command.Data.Status);
+				this.#LastStatus = {...Command.Data.Status, Timestamp: Command.Timestamp};
 			}
 
 		});
@@ -145,9 +147,9 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 			else	
 			{		
 				//if (debug) console.log(`Received attributes: ${JSON.stringify(data)}`);
-				if (JSON.stringify(Command) !== this.#LastAttributes)
-					this.emit('attributes', Command);
-				this.#LastAttributes = {...Command, Timestamp: Command.Timestamp};
+				if (JSON.stringify(Command.Data.Attributes) !== this.#LastAttributes)
+					this.emit('attributes', Command.Data.Attributes);
+				this.#LastAttributes = {...Command.Data.Attributes, Timestamp: Command.Timestamp};
 			}
 		});
 		this.RequestMQTT(MainboardIP, (err) =>
@@ -155,40 +157,6 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 			if (err) return Callback(err);
 			//Callback();				
 		});			
-	}
-
-	/**
-	 * Send a command to the printer
-	 * @param {SDCPCommand|{Id: string, Data: {Cmd: number, Data: Object}, RequestID: string}|number} Command - The command to send to the printer
-	 * @param {Object} [Parameters] - The parameters to send with the command
-	 * @param {function(Error?, Response): void} [Callback] - Callback function to be called when the command is complete
-	 * @returns {Promise<Response>} - Promise that resolves with the response from the printer
-	 */
-	SendCommand(Command, Parameters, Callback)
-	{
-		if (typeof Parameters === 'function') {Callback = Parameters; Parameters = undefined;}		
-
-		if (Callback === undefined) 
-			return new Promise((resolve,reject) => {this.SendCommand(Command, Parameters, (err,response) => {if (err) return reject(err); resolve(response);});});
-		if (!this.#Websocket)
-			Callback(new Error('Not connected to printer'));
-		if (typeof Command === 'number') Command = {Data: {Cmd: Command}};
-		
-		if (typeof Command !== 'object') 				Command = {};
-		if (Command.Id === undefined) 					Command.Id = this.Id;
-		if (typeof Command.Data !== 'object') 			Command.Data = {};
-		if ( Command.Data.MainboardID === undefined) 	Command.Data.MainboardID = this.MainboardID;
-		if ( Command.Data.Data === undefined) 			Command.Data.Data = {};
-		if ( Command.Data.RequestID === undefined) 		Command.Data.RequestID = crypto.randomBytes(16).toString('hex');
-		if ( Command.Data.Timestamp === undefined) 		Command.Data.Timestamp = parseInt(Date.now()/1000);
-		if ( Command.Data.From === undefined) 			Command.Data.From = SDCPConstants.SDCP_FROM.PC;
-		if ( Command.Topic === undefined) 				Command.Topic = `sdcp/request/${this.MainboardID}`;
-		if (Parameters !== undefined && typeof Parameters === 'object')
-			Command.Data.Data = {...Command.Data.Data, ...Parameters};
-	
-		this.#Requests.push({...Command, Callback: Callback});
-		this.#Websocket.send(JSON.stringify(Command));
-		if (debug) console.log(JSON.parse(JSON.stringify(Command), undefined, "\t"));
 	}
 
 	/**
@@ -217,12 +185,17 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 	GetStatus(Cached = false, Callback)
 	{
 		if (typeof Cached === 'function') {Callback = Cached; Cached = false;}		
-		if (Cached !== true || this.#LastStatus === undefined) 
-			return super.GetStatus(false, Callback);
 		if (Callback === undefined) 
 			return new Promise((resolve,reject) => {this.GetStatus(Cached, (err,status) => {if (err) return reject(err); resolve(status);});});
 
-		Callback(undefined, this.#LastStatus);
+		this.SendCommand(new SDCPCommand.SDCPCommandStatus).then((response) =>
+		{
+			if (response.Data && response.Data.Data && response.Data.Data.Ack !== 0)
+				return Callback(new Error('Error getting status'));
+			if (KEEP_CONSISTENT && response && response.Status && response.Status.CurrentStatus !== undefined)
+				response.Status.CurrentStatus = [response.Status.CurrentStatus];
+			Callback(undefined, response.Status);
+		}).catch(err=>Callback(err));
 	}
 
 	/**
@@ -350,7 +323,6 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 			return new Promise((resolve,reject) => {this.GetHistoricalTaskDetails(TaskId, (err,task) => {if (err) return reject(err); resolve(task);});});
 		Callback(new Error('Not implemented'));
 	}
-
 
 	/**
 	 * Send a command to the printer via MQTT

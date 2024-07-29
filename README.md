@@ -53,7 +53,7 @@ Printer.Connect("10.1.1.113").then(()=>
 });
 ```
 
-Note that you need to use the correct SDCPPrinter type for the respective protocol version. `V3.0.0` and above should use the websocket (`SDCPPrinterWS`) class. Below `V3.0.0` should use the USB (`SDCPPrinterUDB`) class.
+Note that you need to use the correct SDCPPrinter type for the respective protocol version. `V3.0.0` and above should use the websocket (`SDCPPrinterWS`) class. Below `V3.0.0` should use the USB (`SDCPPrinterUDB` or `SDCPPrinterMQTT`) classes.
 
 Note that functionality is not yet parallel between the two protocols. Some functions may fail with the error **Not implemented**.
 
@@ -404,13 +404,14 @@ MQTT printer clients upload in a slightly different method. They require the fil
 //Setart an express server
 const express = require('express');
 var app = express();
-app.use((req, res)=>res.setHeader('Content-Disposition', 'attachment; filename=test').sendFile(path.join(__dirname, "test.ctb")));
+app.use((req, res)=>res.setHeader('Content-Disposition', 'attachment; filename=' + path.parse(FileToUpload).base).sendFile(FileToUpload));
 app.listen(3000, ()=>{});
 
 //Connect and request download
+const FileToUpload = "C:\\Flame_Defender_Bust_2_2024_0522_2328.ctb";
 Printer.Connect().then(()=>
 {
-	Printer.UploadFile("C:\\Flame_Defender_Bust_2_2024_0522_2328.ctb", 
+	Printer.UploadFile(FileToUpload, 
 	{
 		//URL (the printer replaces ${ipaddr} with the MQTT server ip)
 		//It also seems to
@@ -471,6 +472,10 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 ---
 
 ## Updates
+
+#### 0.4.8 ####
+- Changed UDP, MQTT and WS GetStatus to be consistent. Sorry for the structure change but this'll make it much easier in the long run ~_~
+- Various tweaks and fixes
 
 #### 0.4.7
 - UploadFile callbacks made consistent between MQTT and WS SDCPPrinters,
