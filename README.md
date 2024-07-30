@@ -1,8 +1,10 @@
 # SDCP
 
-A small work-in-progress library providing a nodejs front end to the SDCP. More information at https://github.com/cbd-tech/SDCP-Smart-Device-Control-Protocol-V3.0.0/blob/main/SDCP(Smart%20Device%20Control%20Protocol)_V3.0.0_EN.md. 
+A small work-in-progress library providing a nodejs front end to the SDCP. More information [here](https://github.com/cbd-tech/SDCP-Smart-Device-Control-Protocol-V3.0.0/blob/main/SDCP(Smart%20Device%20Control%20Protocol)_V3.0.0_EN.md).
 
 Functionality is provided as both promises and callback depending on your preference. Feel free to contribute if you want to improve or get extra features in.
+
+An example of it being used can be found over on [Github](https://github.com/blakejrobinson/sdcp_testclient).
 
 ## Installation
 
@@ -395,38 +397,9 @@ Printer.Connect().then(()=>
 ```js
 {
 	Verification:     {boolean} 			//Whether to verify the upload
-	Progresscallback: {function(progress)}	//A callback that's called every 1mb
-	URL: 			  {string}				//The URL of the download (MQTT printers)
+	ProgressCallback: {function(progress)}	//A callback that's called every 1mb
+	URL: 			  {string}				//A custom URL for MQTT servers. Leave blank for built-in HTTP server
 }
-```
-
-### MQTT uploading
-MQTT printer clients upload in a slightly different method. They require the file to be hosted on an HTTP webserver. Here's an example (using Express running on port 3000):
-```js
-//Setart an express server
-const express = require('express');
-var app = express();
-app.use((req, res)=>res.setHeader('Content-Disposition', 'attachment; filename=' + path.parse(FileToUpload).base).sendFile(FileToUpload));
-app.listen(3000, ()=>{});
-
-//Connect and request download
-const FileToUpload = "C:\\Flame_Defender_Bust_2_2024_0522_2328.ctb";
-Printer.Connect().then(()=>
-{
-	Printer.UploadFile(FileToUpload, 
-	{
-		//URL (the printer replaces ${ipaddr} with the MQTT server ip)
-		//It also seems to
-		URL: "http://${ipaddr}:3000/${70ba9d56f679c0eaa64e29c70e907074.ctb",
-		ProgressCallback: (progress)=>
-		{
-			console.log(progress);
-		}
-	}).then((result)=>
-	{
-		console.log(result);
-	});
-});
 ```
 
 ## Custom commands and handling
@@ -481,6 +454,11 @@ Printer.Autoconnect = 5000;		//Auto re-connect every 5 seconds
 ---
 
 ## Updates
+
+#### 0.5.0 ####
+- Fix for `SDCPPrinterMQTT` not sending updates on FileUpload,
+- `SDCPPrinterMQTT` now uses built in simple HTTP server to serve file,
+- Various tweaks and fixes
 
 #### 0.4.9 ####
 - Improved autoconnect feature for MQTT and WS SDCPPrinters. Autoconnect is now off by default

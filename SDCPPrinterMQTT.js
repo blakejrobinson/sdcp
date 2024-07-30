@@ -8,6 +8,7 @@ const dgram = require('dgram');
 const debug = false;
 const KEEP_CONSISTENT = true;
 
+const HTTPServer = require('./SDCPHTTPServer');
 const MQTTServer = require('./SDCPMQTTServer');
 const mqttServer = require('mqtt-server');
 /** MQTTServer  */
@@ -505,15 +506,15 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 		//Track the upload!
 		var FollowUpload = function(update)
 		{
-			//console.log(JSON.stringify(update, undefined, "\t"));
 			try
 			{
 				var UploadInfo = update.Data.Status.FileTransferInfo;
 				if (debug) 
-					console.log(UploadInfo);
+					console.log(update.Data.Status.CurrentStatus);
+				//console.log(UploadInfo);
 
 				//It failed?
-				if (update.Data.Status.CurrentStatus === 0 && UploadInfo.Status === 3)
+				if (update.Data.Status.CurrentStatus[0] === 0 && UploadInfo.Status === 3)
 				{
 					MQTTServerInstance.off(`/sdcp/status/${this.MainboardID}`, FollowUpload);
 					//this.SendCommand(new SDCPCommand.SDCPCommandTimeperiod(5000));
@@ -521,7 +522,7 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 					return Callback(new Error('Upload failed'), {Status: "Complete", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Complete: 1, Success: false, Result: UploadInfo});
 				}
 				//It success?
-				if (update.Data.Status.CurrentStatus === 0 && UploadInfo.Status === 2)
+				if (update.Data.Status.CurrentStatus[0] === 0 && UploadInfo.Status === 2)
 				{
 					MQTTServerInstance.off(`/sdcp/status/${this.MainboardID}`, FollowUpload);
 					//this.SendCommand(new SDCPCommand.SDCPCommandTimeperiod(5000));
@@ -530,7 +531,7 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 				}
 
 				//Update the progress
-				if (update.Data.Status.CurrentStatus === 2)
+				if (update.Data.Status.CurrentStatus[0] === 2)
 				{
 					if (typeof ProgressCallback === 'function') 
 						ProgressCallback({Status: "Uploading", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Complete: UploadInfo.DownloadOffset / UploadInfo.FileTotalSize});
@@ -538,14 +539,27 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 			}
 			catch (e)
 			{
-				if (debug)
+				//if (debug)
 					console.log(e);
 			}
 		}.bind(this);
 		MQTTServerInstance.on(`/sdcp/status/${this.MainboardID}`, FollowUpload);
 
+		//Start the server for a one-time file send
+		var TemporaryServer;
+		if (!Options || Options.URL === undefined)
+		{
+			TemporaryServer = new HTTPServer();
+			TemporaryServer.Listen(undefined, File, uuid+".ctb", () =>
+			{
+				TemporaryServer.Close();
+				TemporaryServer = undefined;
+			});
+			if (debug) console.log(`Temporarily serving ${File} as ${uuid}.ctb`);
+		}
+
 		//await this.SendCommand(new SDCPCommand.SDCPCommandTimeperiod(250));
-		await this.SendCommand(new SDCPCommand.SDCPCommandFileUpload(filename, totalSize, fileMD5, Options && Options.URL ? Options.URL : fileMD5 + ".ctb"));		
+		await this.SendCommand(new SDCPCommand.SDCPCommandFileUpload(filename, totalSize, fileMD5, Options && Options.URL ? Options.URL : `http://$\{ipaddr\}:${TemporaryServer ? TemporaryServer.Port : 3000}/${uuid + ".ctb"}`));		
 	}	
 }
 
