@@ -445,10 +445,10 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 **Be careful** when sending custom commands. I have crashed my printer by sending unexpected data.
 
 ## Always on connections
-Both `SDCPPrinterWS` and `SDCPPrinterMQTT` have support for for 'always on' connections. Simply set the `AutoReconnect` property to `true` (or a `number` indicating how long in Ms to wait between retries).
+Both `SDCPPrinterWS` and `SDCPPrinterMQTT` have support for for 'always on' connections. Simply set the `AutoConnect` property to `true` (or a `number` indicating how long in Ms to wait between retries).
 ```js
-Printer.AutoReconnect = true;		//Auto re-connect
-Printer.AutoReconnect = 5000;		//Auto re-connect every 5 seconds
+Printer.AutoConnect = true;		//Auto re-connect
+Printer.AutoConnect = 5000;		//Auto re-connect every 5 seconds
 ```
 
 ---
@@ -466,7 +466,7 @@ Printer.AutoReconnect = 5000;		//Auto re-connect every 5 seconds
 - Various tweaks and fixes
 
 #### 0.4.9 ####
-- Improved autoreconnect feature for MQTT and WS SDCPPrinters. AutoReconnect is now off by default
+- Improved autoreconnect feature for MQTT and WS SDCPPrinters. AutoConnect is now off by default
 - Various tweaks and fixes
 
 #### 0.4.8 ####

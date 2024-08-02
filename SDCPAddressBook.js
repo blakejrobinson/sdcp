@@ -81,7 +81,7 @@ class SDCPAddressBook
 			{
 				/** SDCPPrinter.constructor */
 				var PrinterType = SDCPDiscovery.PrinterType(e);
-				this.Add(new PrinterType({...e, AutoReconnect: this.AlwaysOn ? true : false}));
+				this.Add(new PrinterType({...e, AutoConnect: this.AlwaysOn ? true : false}));
 			});
 
 			console.log(`Loaded address book (${this.#AddressBook.length} entries) from ${this.#addressBookFile}`);
@@ -106,7 +106,7 @@ class SDCPAddressBook
 			this.#AddressBook = Entries.map(e=>
 			{
 				var PrinterType = SDCPDiscovery.PrinterType(e);
-				return new PrinterType({...e, AutoReconnect: this.AlwaysOn})
+				return new PrinterType({...e, AutoConnect: this.AlwaysOn ? true : false})
 			});
 			console.log(`Loaded address book (${this.#AddressBook.length} entries) from ${this.#addressBookFile}`);
 			if (typeof Callback === "function")
