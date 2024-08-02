@@ -50,7 +50,9 @@ class SDCPPrinter extends EventEmitter
 		super();
 		if (typeof Config === 'string') Config = {MainboardIP: Config};
 		if (typeof Config !== 'object') Config = {};
-		for (var key in Config) this[key] = Config[key];
+		for (var key in Config) 
+			if (key !== "AutoReconnect") 
+				this[key] = Config[key];
 	}
 
 	/**

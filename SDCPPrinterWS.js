@@ -18,7 +18,7 @@ class SDCPPrinterWS extends require("./SDCPPrinter")
 	/** The websocket for this printer */
 	#Websocket = undefined;
 	/** Whether or not it should try to autoreconnect */
-	#AutoReconnect = false;
+	#_AutoReconnect = false;
 	/** Time between reconnect attempts */
 	#ReconnectInterval = 5000;
 	/** Request queue */
@@ -32,6 +32,16 @@ class SDCPPrinterWS extends require("./SDCPPrinter")
 	/** Last received attributes cache	 */
 	#LastAttributes = undefined;
 
+	constructor(Config)
+	{
+		super(Config);
+		if (Config && Config.AutoReconnect)
+		{
+			this.AutoReconnect = Config.AutoReconnect;
+			delete Config.AutoReconnect;
+		}		
+	}
+
 	/** 
 	 * Set up autoreconnect
 	 * @param {boolean|number} value - Whether or not to autoreconnect. If a number is provided it will be the time between reconnect attempts
@@ -40,14 +50,14 @@ class SDCPPrinterWS extends require("./SDCPPrinter")
 	set AutoReconnect(value) 
 	{
 		if (value === false  || value === true)
-			this.#AutoReconnect = value;
+			this.#_AutoReconnect = value;
 		else if (typeof value === 'number')
 		{
 			this.#ReconnectInterval = value;
-			this.#AutoReconnect = true;
+			this.#_AutoReconnect = true;
 		}
 	}
-	get AutoReconnect() {return this.#AutoReconnect;}
+	get AutoReconnect() {return this.#_AutoReconnect;}
 
 	/**
 	 * Connect to the printer
@@ -92,7 +102,9 @@ class SDCPPrinterWS extends require("./SDCPPrinter")
 		}
 
 		var Printer = this;
+		console.log(Printer);
 		this.#Websocket = new WebSocket(`ws://${MainboardIP}:3030/websocket`, {timeout: 5000});
+		console.log(this.#Websocket);
 		this.#Websocket.on('open', ()=>
 		{
 			if (debug) console.log(`Websocket connected to ${this.#Websocket._socket.remoteAddress}:${this.#Websocket._socket.remotePort}`);
@@ -199,11 +211,11 @@ class SDCPPrinterWS extends require("./SDCPPrinter")
 		this.#Websocket.on('error', (error) => 
 		{
 			if (error.message === "getaddrinfo ENOTFOUND _test_") return;
-
 			if (debug) console.error(`Websocket error: ${error}`);
 			//this.emit('error', error);
-			if (this.#AutoReconnect === false && Callback) 
-			{
+			if (this.#_AutoReconnect === false && Callback) 
+			{				
+				if (debug) console.error(`    Calling error callback`);
 				Callback.call(Printer, error);
 				Callback = undefined;
 			}
@@ -212,20 +224,28 @@ class SDCPPrinterWS extends require("./SDCPPrinter")
 		//Socket closed
 		this.#Websocket.on('close', () => 
 		{
-			if (debug) console.log(`Websocket disconnected`);
+			if (debug) console.log(`Websocket disconnected ${this.Connected}`);
 			this.#Websocket = undefined;			
 			if (this.Connected)
 			{
 				this.Connected = false;
 				this.emit('disconnected');	
 			}
-
+			
 			//Should we try to reconnect?
-			if (this.#AutoReconnect !== false)
+			if (this.#_AutoReconnect !== false)
 			{
+				if (MainboardIP === "10.1.1.45")
+					MainboardIP = "10.1.1.43";
+	
 				this.Reconnecting = !this.Reconnecting ? 1 : this.Reconnecting + 1;
 				if (debug) console.log(`Attempting to reconnect ${this.Reconnecting} in ${Printer.#ReconnectInterval/1000} seconds...`);				
-				setTimeout(()=>{Printer.Connect(MainboardIP, (err)=>{});}, Printer.#ReconnectInterval);
+				setTimeout(()=>{Printer.Connect(MainboardIP, (err)=>
+				{
+					if (!err && Callback)						
+						Callback.call(Printer);
+					Callback = undefined;
+				})}, Printer.#ReconnectInterval);
 			}
 		});		
 

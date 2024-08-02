@@ -12,7 +12,7 @@ class SDCPAddressBook
 	/** Is exiting already */
 	#exiting = false;
 	/** Always online state */
-	AlwaysOn = false;
+	AlwaysOn = true;
 
 	/** Amount of entries in the address book */
 	get length() {return this.#AddressBook.length;}
@@ -81,12 +81,15 @@ class SDCPAddressBook
 			{
 				/** SDCPPrinter.constructor */
 				var PrinterType = SDCPDiscovery.PrinterType(e);
-				this.Add(new PrinterType({...e, AutoConnect: this.AlwaysOn ? true : false}));
+				this.Add(new PrinterType({...e, AutoReconnect: this.AlwaysOn ? true : false}));
 			});
 
 			console.log(`Loaded address book (${this.#AddressBook.length} entries) from ${this.#addressBookFile}`);
 			return true;
-		} catch (err) {return false;}
+		} catch (err)
+		{
+			return false;
+		}
 	}
 
 	/**
@@ -106,7 +109,7 @@ class SDCPAddressBook
 			this.#AddressBook = Entries.map(e=>
 			{
 				var PrinterType = SDCPDiscovery.PrinterType(e);
-				return new PrinterType({...e, AutoConnect: this.AlwaysOn ? true : false})
+				return new PrinterType({...e, AutoReconnect: this.AlwaysOn ? true : false})
 			});
 			console.log(`Loaded address book (${this.#AddressBook.length} entries) from ${this.#addressBookFile}`);
 			if (typeof Callback === "function")

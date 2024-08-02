@@ -1,7 +1,6 @@
 const SDCPConstants = require('./Constants');
 const SDCPCommand  = require('./SDCPCommand');
 const EventEmitter = require('events');
-const WebSocket = require('ws');
 const dgram = require('dgram');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -15,10 +14,8 @@ const UDP_UPDATE_RATE = 500;		//ms
  */
 class SDCPPrinterUDP extends require("./SDCPPrinter")
 {
-	/** The websocket for this printer */
-	#Websocket = undefined;
 	/** Whether or not it should try to autoreconnect */
-	#AutoReconnect = true;
+	#_AutoReconnect = true;
 	/** Request queue */
 	#Requests = [];
 	/** Route updates (statues and attributes) (FIFO queue) */
@@ -81,7 +78,7 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 							Callback(new Error('Failed to connect to printer'));
 						Callback = undefined;
 
-						if (Printer.#AutoReconnect === true)
+						if (Printer.#_AutoReconnect === true)
 							setTimeout(UpdatePrinter.bind(this), UDP_UPDATE_RATE);
 					}
 
@@ -152,7 +149,7 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 
 		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.SendCommand(Command, Parameters, (err,response) => {if (err) return reject(err); resolve(response);});});
-		if (!this.#Websocket)
+		if (!this.Connected)
 			Callback(new Error('Not connected to printer'));
 		if (typeof Command === 'number') Command = {Data: {Cmd: Command}};
 
@@ -169,7 +166,6 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 			Command.Data.Data = {...Command.Data.Data, ...Parameters};
 
 		this.#Requests.push({...Command, Callback: Callback});
-		this.#Websocket.send(JSON.stringify(Command));
 		if (debug) console.log(JSON.parse(JSON.stringify(Command), undefined, "\t"));
 	}
 

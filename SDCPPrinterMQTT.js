@@ -21,7 +21,7 @@ var MQTTServerInstance = undefined;
 class SDCPPrinterMQTT extends require("./SDCPPrinter")
 {
 	/** Whether or not it should try to autoreconnect */
-	#AutoReconnect = false;
+	#_AutoReconnect = false;
 	/** Time between reconnect attempts */
 	#ReconnectInterval = 5000;	
 	/** Request queue */
@@ -35,6 +35,16 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 	/** Last received attributes cache	 */
 	#LastAttributes = undefined;
 
+	constructor(Config)
+	{
+		super(Config);
+		if (Config && Config.AutoReconnect)
+		{
+			this.AutoReconnect = Config.AutoReconnect;
+			delete Config.AutoReconnect;
+		}		
+	}
+
 	/** 
 	 * Set up autoreconnect
 	 * @param {boolean|number} value - Whether or not to autoreconnect. If a number is provided it will be the time between reconnect attempts
@@ -43,14 +53,14 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 	set AutoReconnect(value) 
 	{
 		if (value === false  || value === true)
-			this.#AutoReconnect = value;
+			this.#_AutoReconnect = value;
 		else if (typeof value === 'number')
 		{
 			this.#ReconnectInterval = value;
-			this.#AutoReconnect = true;
+			this.#_AutoReconnect = true;
 		}
 	}
-	get AutoReconnect() {return this.#AutoReconnect;}
+	get AutoReconnect() {return this.#_AutoReconnect;}
 
 	/**
 	 * Connect to the printer
@@ -128,11 +138,16 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 			MQTTServerInstance.removeAllListeners(`/sdcp/response/${this.MainboardID}`  );
 
 			//Should we try to reconnect?
-			if (this.#AutoReconnect !== false)
+			if (this.#_AutoReconnect !== false)
 			{
 				this.Reconnecting = this.Reconnecting ? this.Reconnecting + 1 : 1;
 				if (debug) console.log(`Attempting to reconnect ${this.Reconnecting} in ${this.#ReconnectInterval/1000} seconds...`);				
-				setTimeout(()=>{this.Connect(MainboardIP, (err)=>{});}, this.#ReconnectInterval);
+				setTimeout(()=>{this.Connect(MainboardIP, (err)=>
+				{
+					if (!err && Callback)
+						Callback();
+					Callback = undefined;
+				});}, this.#ReconnectInterval);
 			}
 		});
 		MQTTServerInstance.on(`/sdcp/response/${this.MainboardID}`, (Command) => 
@@ -213,7 +228,7 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 			if (err && err.message === "getaddrinfo ENOTFOUND _TEST_") return;			
 			if (err)
 			{
-				if (Callback && this.#AutoReconnect === false) 
+				if (Callback && this.#_AutoReconnect === false) 
 					return Callback(err);
 				MQTTServerInstance.emit(`disconnect_${this.MainboardID}`);
 			}
