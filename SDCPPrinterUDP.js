@@ -36,9 +36,9 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 	 */
 	Connect(MainboardIP, Callback)
 	{
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.Connect(MainboardIP, function(err) {if (err) return reject(err); resolve();});});
-	
+
 		if (typeof MainboardIP === 'function') {Callback = MainboardIP; MainboardIP = undefined;}
 		if (MainboardIP === undefined) MainboardIP = this.MainboardIP;
 		if (MainboardIP === undefined)
@@ -91,7 +91,7 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 					this.emit('connected');
 				this.Connected = true;
 				if (typeof Callback === 'function')
-					Callback.call(Printer);	
+					Callback.call(Printer);
 				Callback = undefined;
 
 				//Status update?
@@ -118,19 +118,19 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 						if (typeof Printer.#UpdateRoute[0].Callback === "function")
 							Printer.#UpdateRoute[0].Callback(undefined, status.Data.Attributes);
 						Printer.#UpdateRoute.shift();
-					}					
+					}
 					if (JSON.stringify(status.Data.Attributes) !== Printer.#LastAttributes)
 					{
 						if (Printer.#LastAttributes !== undefined) this.emit('attribute', status.Data.Attributes);
 						Printer.#LastAttributes = JSON.stringify(status.Data.Attributes);
 					}
 				}
-				
+
 				//Connection tracking
 				EverConnected = true;
 				FailedAttempts = 0;
 
-				//Check for changes to attributes or events 
+				//Check for changes to attributes or events
 				//if (status && status.Status);
 
 				setTimeout(UpdatePrinter.bind(this), UDP_UPDATE_RATE);
@@ -148,14 +148,14 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 	 */
 	SendCommand(Command, Parameters, Callback)
 	{
-		if (typeof Parameters === 'function') {Callback = Parameters; Parameters = undefined;}		
+		if (typeof Parameters === 'function') {Callback = Parameters; Parameters = undefined;}
 
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.SendCommand(Command, Parameters, (err,response) => {if (err) return reject(err); resolve(response);});});
 		if (!this.#Websocket)
 			Callback(new Error('Not connected to printer'));
 		if (typeof Command === 'number') Command = {Data: {Cmd: Command}};
-		
+
 		if (typeof Command !== 'object') 				Command = {};
 		if (Command.Id === undefined) 					Command.Id = this.Id;
 		if (typeof Command.Data !== 'object') 			Command.Data = {};
@@ -167,126 +167,10 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 		if ( Command.Topic === undefined) 				Command.Topic = `sdcp/request/${this.MainboardID}`;
 		if (Parameters !== undefined && typeof Parameters === 'object')
 			Command.Data.Data = {...Command.Data.Data, ...Parameters};
-	
+
 		this.#Requests.push({...Command, Callback: Callback});
 		this.#Websocket.send(JSON.stringify(Command));
 		if (debug) console.log(JSON.parse(JSON.stringify(Command), undefined, "\t"));
-	}
-
-	/**
-	 * Calculate MD5 hash of a file
-	 * @param {string} filePath - Path to the file
-	 * @returns {Promise<string>} - MD5 hash of the file
-	 */
-	async #calculateFileMD5(filePath) 
-	{
-		return new Promise((resolve, reject) => 
-		{
-			const hash = crypto.createHash('md5');
-			const stream = fs.createReadStream(filePath);
-			stream.on('data', (data) => hash.update(data));
-			stream.on('end', () => resolve(hash.digest('hex')));
-			stream.on('error', reject);
-		});
-	}
-		
-	/**
-	 * Upload a file to the printer
-	 * @param {string} File - The path to the file to upload
-	 * @param {{Verification: boolean, ProgressCallback: function(Progress): void}} Options - The options to use
-	 * @param {function(Error?, Object): void} [Callback] - Callback function to be called when the command is complete
-	 * @returns {Promise<Object>} - Promise that resolves with the response from the printer
-	 */
-	async UploadFile(File, Options, Callback)
-	{
-		if (typeof Options === 'function') {Callback = Options; Options = {};}
-		if (Options === undefined) Options = {};
-		if (Callback === undefined) 
-			return new Promise((resolve,reject) => {this.UploadFile(File, Options, (err,response) => {if (err) return reject(err); resolve(response);});});
-
-		const { Verification: verification = true, ProgressCallback: progressCallback } = Options;
-		const fileStats = await fs.promises.stat(File);
-		const totalSize = fileStats.size;
-		const chunkSize = 1024 * 1024; // 1MB chunks
-		const uuid = crypto.randomBytes(32).toString('hex');
-
-		let uploadedSize = 0;
-		let md5Hash = crypto.createHash('md5');
-		let Result = undefined;
-		let filename = path.basename(File);
-		const fileMD5 = await this.#calculateFileMD5(File);
-
-		if (typeof progressCallback === 'function') 
-			progressCallback({Status: "Preparing",
-						"S-File-MD5": fileMD5,
-						Uuid: uuid,
-						Offset: uploadedSize,
-						TotalSize: totalSize,
-						Complete: uploadedSize / totalSize,
-						File: filename});
-
-		const fileHandle = await fs.promises.open(File, 'r');
-		try 
-		{
-			while (uploadedSize < totalSize) 
-			{
-				const buffer = Buffer.alloc(chunkSize);
-				const { bytesRead } = await fileHandle.read(buffer, 0, chunkSize, uploadedSize);
-				if (bytesRead === 0) break;			
-			
-				const chunk = buffer.slice(0, bytesRead);
-				md5Hash.update(chunk);
-
-				const formData = new FormData();
-				formData.append('Uuid', uuid);
-				formData.append('Offset', uploadedSize.toString());
-				formData.append('TotalSize', totalSize.toString());
-				formData.append('Check', verification ? '1' : '0');
-				formData.append('S-File-MD5', fileMD5);
-				formData.append('File', new Blob([chunk]), filename);//  { filename: 'chunk' });
-				
-				if (debug) console.log(`Uploading chunk of size ${chunk.length} bytes`);
-				const response = await fetch(`http://${this.MainboardIP}:3030/uploadFile/upload`, 
-				{
-					method: 'POST',
-					body: formData
-				});
-		
-				if (!response.ok) 
-				{
-					const errorData = await response.json();
-					if (debug) console.error(`Upload failed: ${JSON.stringify(errorData)}`);
-					throw new Error(`Upload failed: ${JSON.stringify(errorData)}`);
-				}
-				else 
-					Result = await response.json();
-		
-				uploadedSize += chunk.length;
-				if (typeof progressCallback === 'function') 
-					progressCallback({Status: "Uploading",
-								"S-File-MD5": fileMD5,
-								Uuid: uuid,
-								Offset: uploadedSize,
-								TotalSize: totalSize,
-								Complete: uploadedSize / totalSize,
-								File: filename});
-			}	
-
-			if (debug) console.log('File upload completed successfully');			
-		}
-		finally 
-		{
-      		await fileHandle.close();			
-    	}
-
-		Callback(undefined, {Status: "Complete",
-							 "S-File-MD5": fileMD5,
-							 Uuid: uuid,
-							 Offset: uploadedSize,
-							 TotalSize: totalSize,
-							 Complete: uploadedSize / totalSize,
-							 File: filename,
-							 Result: Result});
 	}
 
 	/**
@@ -297,11 +181,11 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 	 */
 	GetStatus(Cached = false, Callback)
 	{
-		if (typeof Cached === 'function') {Callback = Cached; Cached = false;}		
-		if (Callback === undefined) 
+		if (typeof Cached === 'function') {Callback = Cached; Cached = false;}
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.GetStatus(Cached, (err,status) => {if (err) return reject(err); resolve(status);});});
 
-		if (Cached === true && this.#LastStatus === undefined) 
+		if (Cached === true && this.#LastStatus === undefined)
 			return Callback(undefined, this.#LastStatus);
 
 		//We want one the next time it comes in
@@ -317,16 +201,116 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 	 */
 	GetAttributes(Cached = false, Callback)
 	{
-		if (typeof Cached === 'function') {Callback = Cached; Cached = false;}		
-		if (Callback === undefined) 
+		if (typeof Cached === 'function') {Callback = Cached; Cached = false;}
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.GetAttributes(Cached, (err,attributes) => {if (err) return reject(err); resolve(attributes);});});
 
-		if (Cached === true && this.#LastAttributes === undefined) 
+		if (Cached === true && this.#LastAttributes === undefined)
 			return Callback(undefined, this.#LastAttributes);
 
 		//We want one the next time it comes in
 		this.#UpdateRoute.push({Type: 'attributes', Callback: Callback});
 		this.Broadcast(this.MainboardIP, {timeout: 500});
+	}
+
+	/**
+	 * Calculate MD5 hash of a file
+	 * @param {string} filePath - Path to the file
+	 * @returns {Promise<string>} - MD5 hash of the file
+	 */
+	async #calculateFileMD5(filePath)
+	{
+		return new Promise((resolve, reject) =>
+		{
+			const hash = crypto.createHash('md5');
+			const stream = fs.createReadStream(filePath);
+			stream.on('data', (data) => hash.update(data));
+			stream.on('end', () => resolve(hash.digest('hex')));
+			stream.on('error', reject);
+		});
+	}
+
+	/**
+	 * Upload a file to the printer
+	 * @param {string} File - The path to the file to upload
+	 * @param {{URL: string, Verification: boolean, ProgressCallback: function(Progress): void}} Options - The options to use
+	 * @param {function(Error?, Object): void} [Callback] - Callback function to be called when the command is complete
+	 * @returns {Promise<Object>} - Promise that resolves with the response from the printer
+	 */
+	async UploadFile(File, Options, Callback)
+	{
+		if (typeof Options === 'function') {Callback = Options; Options = {};}
+		if (Options === undefined) Options = {};
+		if (Callback === undefined)
+			return new Promise((resolve,reject) => {this.UploadFile(File, Options, (err,response) => {if (err) return reject(err); resolve(response);});});
+
+		const { Verification, ProgressCallback } = Options;
+		const fileStats = await fs.promises.stat(File);
+		const totalSize = fileStats.size;
+		const uuid = crypto.randomBytes(32).toString('hex');
+
+		let md5Hash = crypto.createHash('md5');
+		let Result = undefined;
+		let filename = path.basename(File);
+		const fileMD5 = await this.#calculateFileMD5(File);
+
+		//Track the upload!
+		var FollowUpload = function(update)
+		{
+			try
+			{
+				var UploadInfo = update.Data.Status.FileTransferInfo;
+				if (debug)
+					console.log(update.Data.Status.CurrentStatus);
+				//console.log(UploadInfo);
+
+				//It failed?
+				if (update.Data.Status.CurrentStatus[0] === 0 && UploadInfo.Status === 3)
+				{
+					MQTTServerInstance.off(`/sdcp/status/${this.MainboardID}`, FollowUpload);
+					//this.SendCommand(new SDCPCommand.SDCPCommandTimeperiod(5000));
+					ProgressCallback({Status: "Complete", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Complete: 1, Success: false, Result: UploadInfo});
+					return Callback(new Error('Upload failed'), {Status: "Complete", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Complete: 1, Success: false, Result: UploadInfo});
+				}
+				//It success?
+				if (update.Data.Status.CurrentStatus[0] === 0 && UploadInfo.Status === 2)
+				{
+					MQTTServerInstance.off(`/sdcp/status/${this.MainboardID}`, FollowUpload);
+					//this.SendCommand(new SDCPCommand.SDCPCommandTimeperiod(5000));
+					ProgressCallback({Status: "Complete", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Success: true, Complete: 1, Result: UploadInfo});
+					return Callback(undefined, {Status: "Complete", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Success: true, Complete: 1, Result: UploadInfo});
+				}
+
+				//Update the progress
+				if (update.Data.Status.CurrentStatus[0] === 2)
+				{
+					if (typeof ProgressCallback === 'function')
+						ProgressCallback({Status: "Uploading", "S-File-MD5": fileMD5, Uuid: uuid, Offset: UploadInfo.DownloadOffset, TotalSize: UploadInfo.FileTotalSize, File: filename, URL: Options.URL, Complete: UploadInfo.DownloadOffset / UploadInfo.FileTotalSize});
+				}
+			}
+			catch (e)
+			{
+				//if (debug)
+					console.log(e);
+			}
+		}.bind(this);
+		MQTTServerInstance.on(`/sdcp/status/${this.MainboardID}`, FollowUpload);
+
+		//Start the server for a one-time file send
+		var TemporaryServer;
+		if (!Options || Options.URL === undefined)
+		{
+			TemporaryServer = new HTTPServer();
+			TemporaryServer.Listen(undefined, File, uuid+".ctb", () =>
+			{
+				TemporaryServer.Close();
+				TemporaryServer = undefined;
+			});
+			if (debug) console.log(`Temporarily serving ${File} as ${uuid}.ctb`);
+		}
+
+		//await this.SendCommand(new SDCPCommand.SDCPCommandTimeperiod(250));
+		await this.SendCommand(new SDCPCommand.SDCPCommandFileUpload(filename, totalSize, fileMD5, Options && Options.URL ? Options.URL : `http://$\{ipaddr\}:${TemporaryServer ? TemporaryServer.Port : 3000}/${uuid + ".ctb"}`));
 	}
 
 	/**
@@ -341,7 +325,7 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 		if (typeof Layer === 'function') {Callback = Layer; Layer = 0;}
 		if (Layer === undefined) Layer = 0;
 
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.Start(File, (err) => {if (err) return reject(err); resolve();});});
 		Callback(new Error('Not implemented'));
 	}
@@ -353,7 +337,7 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 	 */
 	Pause(Callback)
 	{
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.Pause((err) => {if (err) return reject(err); resolve();});});
 		Callback(new Error('Not implemented'));
 	}
@@ -365,7 +349,7 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 	 */
 	Stop(Callback)
 	{
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.Stop((err) => {if (err) return reject(err); resolve();});});
 		Callback(new Error('Not implemented'));
 	}
@@ -378,7 +362,7 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 	GetFiles(Path, Callback)
 	{
 		if (typeof Path === 'function') {Callback = Path; Path = undefined;}
-		if (typeof Callback !== "function") 
+		if (typeof Callback !== "function")
 			return new Promise((resolve,reject) => {this.GetFiles(Path, (err,files) => {if (err) return reject(err); resolve(files);});});
 		Callback(new Error('Not implemented'));
 	}
@@ -394,9 +378,9 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 	{
 		if (typeof Folders === 'function') {Callback = Folders; Folders = undefined;}
 
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.DeleteFilesFolders(Files, Folders, (err) => {if (err) return reject(err); resolve();});});
-		Callback(new Error('Not implemented'));	
+		Callback(new Error('Not implemented'));
 	}
 
 	/**
@@ -418,7 +402,7 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 	GetHistoricalTasks(Expand=false, Callback)
 	{
 		if (typeof Expand === 'function') {Callback = Expand; Expand = false;}
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.GetHistoricalTasks(Expand, (err,tasks) => {if (err) return reject(err); resolve(tasks);});});
 		Callback(new Error('Not implemented'));
 	}
@@ -431,7 +415,7 @@ class SDCPPrinterUDP extends require("./SDCPPrinter")
 	 */
 	GetHistoricalTaskDetails(TaskId, Callback)
 	{
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.GetHistoricalTaskDetails(TaskId, (err,task) => {if (err) return reject(err); resolve(task);});});
 		Callback(new Error('Not implemented'));
 	}

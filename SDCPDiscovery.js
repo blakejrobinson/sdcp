@@ -7,17 +7,22 @@ const debug = false;
 
 /**
  * Discover SDCP devices on the network
- * @param {{timeout: number, connect: bool, callback: function}|number} [Options] - Options for the discovery process or timeout value
+ * @param {{Timeout: number, Connect: bool, Callback: function}|number} [Options] - Options for the discovery process or timeout value
  * @param {function(Error?, SDCPPrinter[]): void} [Callback] - Callback function to be called when the discovery process is complete
  * @returns {Promise<SDCPPrinter[]>} - Promise that resolves with an array of SDCPPrinter objects
 */
 function SDCPDiscovery(Options, Callback)
 {
+	//Legacy
+	if (Options && Options.callback !== undefined) throw("Options.callback is not a valid option. Use Options.Connect instead.");
+	if (Options && Options.connect !== undefined)  throw("Options.connect is not a valid option. Use Options.Connect instead.");
+	if (Options && Options.timeout !== undefined)  throw("Options.timeout is not a valid option. Use Options.Timeout instead.");
+
 	if (typeof Options === 'function') {Callback = Options; Options = {};}
-	if (typeof Options === 'number')   {Options = {timeout: Options};}
+	if (typeof Options === 'number')   {Options = {Timeout: Options};}
 	if (typeof Options !== 'object')   {Options = {};}
-	if (Options.timeout === undefined) {Options.timeout = 1000;}
-	if (Options.connect === undefined) {Options.connect = false;}
+	if (Options.Timeout === undefined) {Options.Timeout = 1000;}
+	if (Options.Connect === undefined) {Options.Connect = false;}
 
 	//No callback? Handle this as a promise
 	if (!Callback)
@@ -37,7 +42,7 @@ function SDCPDiscovery(Options, Callback)
 			Callback(undefined, Devices);
 
 		//Now connect the printers
-		if (Options.connect)
+		if (Options.Connect)
 		{
 			for (var Printer of Devices)
 			{
@@ -45,10 +50,10 @@ function SDCPDiscovery(Options, Callback)
 					Printer.Connect();
 			}
 		}
-	}, Options.timeout);
+	}, Options.Timeout);
 
 	client.bind(() => client.setBroadcast(true));
-	client.on('message', (msg, rinfo) => 
+	client.on('message', (msg, rinfo) =>
 	{
 		if (debug) console.log(`    Received response from ${rinfo.address}:${rinfo.port}`);
 		if (debug) console.log(msg.toString());
@@ -56,8 +61,8 @@ function SDCPDiscovery(Options, Callback)
 		var PrinterInfo = {};
 		try
 		{
-			PrinterInfo = JSON.parse(msg.toString());			
-		} catch(err) 
+			PrinterInfo = JSON.parse(msg.toString());
+		} catch(err)
 		{
 			if (debug) console.error('    Error parsing JSON:', err);
 			return;
@@ -70,14 +75,14 @@ function SDCPDiscovery(Options, Callback)
 		if (PrinterInfo.Data.Attributes) PrinterInfo.Data.Attributes.Id = PrinterInfo.Id;
 		var PrinterType = SDCPDiscovery.PrinterType(PrinterInfo.Data && PrinterInfo.Data.Attributes ? PrinterInfo.Data.Attributes : PrinterInfo.Data);
 		Devices.push(new PrinterType(PrinterInfo.Data && PrinterInfo.Data.Attributes ? PrinterInfo.Data.Attributes : PrinterInfo.Data ? PrinterInfo.Data : PrinterInfo));
-		if (typeof Options.callback === "function")
-			Options.callback(Devices[Devices.length-1]);
+		if (typeof Options.Callback === "function")
+			Options.Callback(Devices[Devices.length-1]);
 	});
 
 	if (debug) console.log('Broadcasting discovery message...');
-	client.send(discoveryMessage, 3000, broadcastAddress, (err) => 
+	client.send(discoveryMessage, 3000, broadcastAddress, (err) =>
 	{
-		if (err) 
+		if (err)
 		{
 			if (debug) console.error('    Error broadcasting message:', err);
 		}
@@ -99,7 +104,7 @@ function SDCPConnect(MainboardIP, PrinterType, Callback)
 	if (typeof PrinterType === 'function') {Callback = PrinterType; PrinterType = SDCPPrinter;}
 	if (typeof PrinterType !== 'function') PrinterType = SDCPPrinter;
 
-	if (typeof Callback !== 'function') 
+	if (typeof Callback !== 'function')
 		return new Promise((resolve,reject) => {SDCPConnect(MainboardIP, function(err,device) {if (err) return reject(err); resolve(device);});});
 	var Printer = new PrinterType(MainboardIP);
 	Printer.Connect().then(()=>
@@ -113,7 +118,7 @@ const SDCPPrinterMQTT = require('./SDCPPrinterMQTT.js');
 const SDCPPrinterWS   = require('./SDCPPrinterWS.js');
 /**
  * Return the correct printer handler to use
- * @param {Object} about 
+ * @param {Object} about
  * @returns {SDCPPrinter} - The printer handler to use
  */
 function PrinterType(about)

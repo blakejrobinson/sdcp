@@ -29,9 +29,9 @@ SDCP.SDCPDiscovery().then((devices) =>
 `SDCPDiscovery` can take an optional object parameter:
 ```js
 {
-	timeout: {number=1000} 			//The amount of time to wait for all printers to reply
-	connect: {boolean=false}		//If set to true, discover will also connect to all V3.0.0+ printers
-	callback: {function} 			//An optional callback that is called every time a printer is added.
+	Timeout: {number=1000} 			//The amount of time to wait for all printers to reply
+	Connect: {boolean=false}		//If set to true, discover will also connect to all V3.0.0+ printers
+	Callback: {function} 			//An optional callback that is called every time a printer is added.
 }
 ```
 
@@ -445,15 +445,20 @@ It's probably better to extend the SDCPCommand classes with your own entries to 
 **Be careful** when sending custom commands. I have crashed my printer by sending unexpected data.
 
 ## Always on connections
-Both `SDCPPrinterWS` and `SDCPPrinterMQTT` have support for for 'always on' connections. Simply set the `Autoconnect` property to `true` (or a `number` indicating how long in Ms to wait between retries).
+Both `SDCPPrinterWS` and `SDCPPrinterMQTT` have support for for 'always on' connections. Simply set the `AutoReconnect` property to `true` (or a `number` indicating how long in Ms to wait between retries).
 ```js
-Printer.Autoconnect = true;		//Auto re-connect
-Printer.Autoconnect = 5000;		//Auto re-connect every 5 seconds
+Printer.AutoReconnect = true;		//Auto re-connect
+Printer.AutoReconnect = 5000;		//Auto re-connect every 5 seconds
 ```
 
 ---
 
 ## Updates
+
+#### 0.5.1 ####
+- `SDCPDiscovery` options made consistent case-wise (starting with capitals - apologies),
+- `SDCPCommandFileCancelUpload` command added to prebuild commands (couldn't seem to get it to work, but adding it),
+- Various tweaks and fixes
 
 #### 0.5.0 ####
 - Fix for `SDCPPrinterMQTT` not sending updates on FileUpload,
@@ -461,7 +466,7 @@ Printer.Autoconnect = 5000;		//Auto re-connect every 5 seconds
 - Various tweaks and fixes
 
 #### 0.4.9 ####
-- Improved autoconnect feature for MQTT and WS SDCPPrinters. Autoconnect is now off by default
+- Improved autoreconnect feature for MQTT and WS SDCPPrinters. AutoReconnect is now off by default
 - Various tweaks and fixes
 
 #### 0.4.8 ####

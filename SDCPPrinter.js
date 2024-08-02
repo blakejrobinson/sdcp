@@ -33,8 +33,6 @@ class SDCPPrinter extends EventEmitter
 	FirmwareVersion = undefined;
 	/** Connected? */
 	Connected = false;
-	/** Always on */
-	AlwaysOn = false;
 
 	/**
 	 * Create a new SDCPPrinter instance
@@ -46,17 +44,13 @@ class SDCPPrinter extends EventEmitter
 	 * @param {string} Config.MainboardID - The ID of the printer
 	 * @param {string} Config.ProtocolVersion - The protocol version of the printer
 	 * @param {string} Config.FirmwareVersion - The firmware version of the printer
-	 * @param {boolean} Config.AlwaysOn - Whether or not connection should be automatically maintained with the printer
 	 */
-	constructor(Config) 
+	constructor(Config)
 	{
 		super();
 		if (typeof Config === 'string') Config = {MainboardIP: Config};
 		if (typeof Config !== 'object') Config = {};
 		for (var key in Config) this[key] = Config[key];
-
-		if (this.AlwaysOn) 
-			this.SetupAlwaysOn();
 	}
 
 	/**
@@ -67,7 +61,7 @@ class SDCPPrinter extends EventEmitter
 	 */
 	Connect(MainboardIP, Callback)
 	{
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.Connect(MainboardIP, function(err) {if (err) return reject(err); resolve();});});
 		Callback(new Error('Not implemented'));
 	}
@@ -77,7 +71,7 @@ class SDCPPrinter extends EventEmitter
 	 * @param {Object|number} [Options] - Options for the broadcast (number is the timeout)
 	 * @param {function(Error?): void} [Callback] - Callback function to be called when the connection is established
 	 * @returns {Promise<void>} - Promise that resolves when the connection is established
-	 */	
+	 */
 	Broadcast(MainboardIP, Options, Callback)
 	{
 		if (typeof Options === 'function') {Callback = Options; Options = undefined;}
@@ -104,39 +98,39 @@ class SDCPPrinter extends EventEmitter
 
 		const client = dgram.createSocket('udp4');
 		const discoveryMessage = 'M99999';
-		
+
 		client.bind(() => client.setBroadcast(true));
-		client.on('message', (msg, rinfo) => 
+		client.on('message', (msg, rinfo) =>
 		{
 			if (timedOut) return;
 			if (timeoutWatch) clearTimeout(timeoutWatch);
 
 			if (debug) console.log(`    Received response from ${rinfo.address}:${rinfo.port}`);
 			if (debug) console.log(`    ${msg.toString()}`);
-	
+
 			var PrinterInfo = {};
 			try
 			{
-				PrinterInfo = JSON.parse(msg.toString());			
-			} catch(err) 
+				PrinterInfo = JSON.parse(msg.toString());
+			} catch(err)
 			{
 				if (debug) console.error('    Error parsing JSON:', err);
 				return Callback(err);
 			}
-	
+
 			if (PrinterInfo.Data.Attributes && !PrinterInfo.Data.Attributes.MainboardIP)
 				PrinterInfo.Data.Attributes.MainboardIP = rinfo.address;
-	
+
 			PrinterInfo.Data.Id = PrinterInfo.Id;
 			for (var key in PrinterInfo.Data) this[key] = PrinterInfo.Data[key];
 			Callback(undefined, PrinterInfo);
 			//client.close();
 		});
-	
+
 		if (debug) console.log('Broadcasting discovery message...');
-		client.send(discoveryMessage, 3000, MainboardIP, (err) => 
+		client.send(discoveryMessage, 3000, MainboardIP, (err) =>
 		{
-			if (err) 
+			if (err)
 			{
 				if (debug) console.error('    Error broadcasting message:', err);
 			}
@@ -156,8 +150,8 @@ class SDCPPrinter extends EventEmitter
 	 */
 	SendCommand(Command, Parameters, Callback)
 	{
-		if (typeof Parameters === 'function') {Callback = Parameters; Parameters = undefined;}		
-		if (Callback === undefined) 
+		if (typeof Parameters === 'function') {Callback = Parameters; Parameters = undefined;}
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.SendCommand(Command, Parameters, (err,response) => {if (err) return reject(err); resolve(response);});});
 
 		Callback(new Error('Not implemented'));
@@ -171,8 +165,8 @@ class SDCPPrinter extends EventEmitter
 	 */
 	GetStatus(Cached = false, Callback)
 	{
-		if (typeof Cached === 'function') {Callback = Cached; Cached = false;}		
-		if (Callback === undefined) 
+		if (typeof Cached === 'function') {Callback = Cached; Cached = false;}
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.GetStatus(Cached, (err,status) => {if (err) return reject(err); resolve(status);});});
 
 		this.SendCommand(new SDCPCommand.SDCPCommandStatus).then((response) =>
@@ -192,7 +186,7 @@ class SDCPPrinter extends EventEmitter
 	GetAttributes(Cached = false, Callback)
 	{
 		if (typeof Cached === 'function') {Callback = Cached; Cached = false;}
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.GetAttributes(Cached, (err,attributes) => {if (err) return reject(err); resolve(attributes);});});
 
 		this.SendCommand(new SDCPCommand.SDCPCommandAttributes).then((response) =>
@@ -201,7 +195,7 @@ class SDCPPrinter extends EventEmitter
 				return Callback(new Error('Error getting attributes'));
 			Callback(undefined, response.Attributes);
 		}).catch(err=>Callback(err));
-	}	
+	}
 
 	/**
 	 * Start a print job on the printer
@@ -215,7 +209,7 @@ class SDCPPrinter extends EventEmitter
 		if (typeof Layer === 'function') {Callback = Layer; Layer = 0;}
 		if (Layer === undefined) Layer = 0;
 
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.Start(File, (err) => {if (err) return reject(err); resolve();});});
 
 		if (File === undefined)
@@ -236,7 +230,7 @@ class SDCPPrinter extends EventEmitter
 	 */
 	Pause(Callback)
 	{
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.Pause((err) => {if (err) return reject(err); resolve();});});
 
 		this.SendCommand(new SDCPCommand.SDCPCommandPause()).then((response) =>
@@ -254,7 +248,7 @@ class SDCPPrinter extends EventEmitter
 	 */
 	Stop(Callback)
 	{
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.Stop((err) => {if (err) return reject(err); resolve();});});
 
 		this.SendCommand(new SDCPCommand.SDCPCommandStop()).then((response) =>
@@ -273,7 +267,7 @@ class SDCPPrinter extends EventEmitter
 	GetFiles(Path, Callback)
 	{
 		if (typeof Path === 'function') {Callback = Path; Path = undefined;}
-		if (typeof Callback !== "function") 
+		if (typeof Callback !== "function")
 			return new Promise((resolve,reject) => {this.GetFiles(Path, (err,files) => {if (err) return reject(err); resolve(files);});});
 
 		this.SendCommand(new SDCPCommand.SDCPCommandFileList(Path)).then((response) =>
@@ -297,9 +291,9 @@ class SDCPPrinter extends EventEmitter
 	{
 		if (typeof Folders === 'function') {Callback = Folders; Folders = undefined;}
 
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.DeleteFilesFolders(Files, Folders, (err) => {if (err) return reject(err); resolve();});});
-		
+
 		if (Files === undefined) Files = [];
 		if (Folders === undefined) Folders = [];
 		if (Array.isArray(Files) === false) Files = [Files];
@@ -312,7 +306,7 @@ class SDCPPrinter extends EventEmitter
 				if (response.Data && response.Data.Data && response.Data.Data.ErrData)
 					return Callback(new Error('Error deleting file/folder list'), response.Data.Data.ErrData);
 				Callback(undefined);
-			}).catch(err=>Callback(err));		
+			}).catch(err=>Callback(err));
 	}
 
 	/**
@@ -334,7 +328,7 @@ class SDCPPrinter extends EventEmitter
 	GetHistoricalTasks(Expand=false, Callback)
 	{
 		if (typeof Expand === 'function') {Callback = Expand; Expand = false;}
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.GetHistoricalTasks(Expand, (err,tasks) => {if (err) return reject(err); resolve(tasks);});});
 
 		this.SendCommand(new SDCPCommand.SDCPCommandHistoricalTasks()).then((response) =>
@@ -343,7 +337,7 @@ class SDCPPrinter extends EventEmitter
 				return Callback(new Error('Error getting historical tasks'));
 			if (!response.Data || !response.Data.Data || !response.Data.Data.HistoryData)
 				return Callback(new Error('No historical tasks received'));
-			if (!Expand) 
+			if (!Expand)
 				return Callback(undefined, response.Data.Data.HistoryData);
 			this.GetHistoricalTaskDetails(response.Data.Data.HistoryData, Callback);
 		}).catch(err=>Callback(err));
@@ -357,12 +351,12 @@ class SDCPPrinter extends EventEmitter
 	 */
 	GetHistoricalTaskDetails(TaskId, Callback)
 	{
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.GetHistoricalTaskDetails(TaskId, (err,task) => {if (err) return reject(err); resolve(task);});});
 
 		if (TaskId === undefined)
 			return Callback(new Error('No task ID provided'));
-		
+
 		this.SendCommand(new SDCPCommand.SDCPCommandTaskDetails(TaskId)).then((response) =>
 		{
 			if (response.Data && response.Data.Data && response.Data.Data.Ack !== 0)
@@ -370,7 +364,7 @@ class SDCPPrinter extends EventEmitter
 			if (!response.Data || !response.Data.Data || !response.Data.Data.HistoryDetailList)
 				return Callback(new Error('No historical tasks received'));
 			var Tasks = {};
-			response.Data.Data.HistoryDetailList.forEach((task) => 
+			response.Data.Data.HistoryDetailList.forEach((task) =>
 			{
 				task.BeginTime = new Date(task.BeginTime * 1000);
 				task.EndTime   = new Date(task.EndTime   * 1000);
@@ -380,7 +374,7 @@ class SDCPPrinter extends EventEmitter
 				if (task.ErrorStatusReason !== undefined) 	task.ErrorStatusReasonText = SDCPConstants.SDCP_PRINT_TASKERROR_DESCRIPTIONS[task.ErrorStatusReason];
 				Tasks[task.TaskId] = task;
 			});
-			if (!Array.isArray(TaskId)) 
+			if (!Array.isArray(TaskId))
 				return Callback(undefined, Tasks[TaskId]);
 			Callback(undefined, Tasks);
 		});
@@ -394,7 +388,7 @@ class SDCPPrinter extends EventEmitter
 	 */
 	SetTimelapse(Enable, Callback)
 	{
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.SetTimelapse(Enable, (err,response) => {if (err) return reject(err); resolve(response);});});
 
 		this.SendCommand(new SDCPCommand.SDCPCommandTimelapse(Enable)).then((response) =>
@@ -413,13 +407,13 @@ class SDCPPrinter extends EventEmitter
 	 */
 	SetVideoStream(Enable, Callback)
 	{
-		if (Callback === undefined) 
+		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.SetVideoStream(Enable, (err,response) => {if (err) return reject(err); resolve(response);});});
 
 		this.SendCommand(new SDCPCommand.SDCPCommandVideoStream(Enable)).then((response) =>
 		{
 			if (response.Data && response.Data.Data && response.Data.Data.Ack !== 0)
-				return Callback(new Error(response.Data.Data.Ack === 1 ? 'Exceeded maximum number of video streams' 
+				return Callback(new Error(response.Data.Data.Ack === 1 ? 'Exceeded maximum number of video streams'
 										: response.Data.Data.Ack === 2 ? 'Camera does not exist'
 										: 'Unknown error'));
 			Callback(undefined, response && response.Data && response.Data.Data ? response.Data.Data.VideoUrl : undefined);
@@ -427,9 +421,27 @@ class SDCPPrinter extends EventEmitter
 	}
 
 	/**
-	 * Set up the printer to always be connected
+	 * Cancel the current upload
+	 * @param {string} Uuid - The Uuid of the upload
+	 * @param {string} FileName - The name of the file being uploaded
+	 * @param {function(Error?): void} [Callback] - Callback function to be called when the command is complete
 	 */
-	SetupAlwaysOn() { return; }
+	CancelUpload(Uuid, File, Callback)
+	{
+		if (Callback === undefined)
+			return new Promise((resolve,reject) => {this.CancelUpload(Uuid, File, (err) => {if (err) return reject(err); resolve();});});
+
+		this.SendCommand(new SDCPCommand.SDCPCommandFileCancelUpload(Uuid, File)).then((response) =>
+			{
+				if (response.Data && response.Data.Data && response.Data.Data.Ack !== 0)
+					return Callback(new Error(response.Data.Data.Ack === SDCPConstants.SDCP_FILE_TRANSFER_ACK.NOT_TRANSFER ? 'Not currently transferring'
+											: response.Data.Data.Ack === SDCPConstants.SDCP_FILE_TRANSFER_ACK.NOT_FOUND    ? 'File not found'
+											: response.Data.Data.Ack === SDCPConstants.SDCP_FILE_TRANSFER_ACK.CHECKING     ? 'Printer already checking'
+											: 'Unknown error'));
+				Callback(undefined, response);
+			}).catch(err=>Callback(err));
+	}
+
 
 	/**
 	 * JSON representation of the printer
@@ -437,13 +449,13 @@ class SDCPPrinter extends EventEmitter
 	 */
 	toJSON()
 	{
-		return {Id: this.Id, 
+		return {Id: this.Id,
 				Name: this.Name,
-				MachineName: this.MachineName, 
-				BrandName: this.BrandName, 
-				MainboardIP: this.MainboardIP, 
-				MainboardID: this.MainboardID, 
-				ProtocolVersion: this.ProtocolVersion, 
+				MachineName: this.MachineName,
+				BrandName: this.BrandName,
+				MainboardIP: this.MainboardIP,
+				MainboardID: this.MainboardID,
+				ProtocolVersion: this.ProtocolVersion,
 				FirmwareVersion: this.FirmwareVersion
 			};
 	}

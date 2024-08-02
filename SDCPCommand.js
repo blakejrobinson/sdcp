@@ -17,7 +17,7 @@ class SDCPCommand
 		RequestID: undefined,
 		MainboardID: undefined,
 		Timestamp: parseInt(Date.now()/1000),
-		From: SDCPConstants.SDCP_FROM.PC
+		From: global.SDCPCommandFrom || SDCPConstants.SDCP_FROM.PC
 	};
 	/** The topic */
 	Topic = undefined;
@@ -102,6 +102,25 @@ class SDCPCommandRename extends SDCPCommand
 		super();
 		this.Data.Cmd = 192;
 		this.Data.Data = {Name: Name};
+	}
+}
+
+class SDCPCommandFileCancelUpload extends SDCPCommand
+{
+	/** 
+	 * Start printing a file
+	 * @param {string} Uuid - The UUID of the upload
+	 * @param {string} FileName - The path to file
+	 * 
+	 */
+	constructor(Uuid, FileName)
+	{
+		super();	
+		this.Data.Cmd = 255;
+		this.Data.Data = {
+			Uuid: Uuid,
+			FileName: FileName
+		};
 	}
 }
 
@@ -248,5 +267,6 @@ module.exports =
 	SDCPCommandVideoStream,
 	SDCPCommandTimelapse,
 	SDCPCommandFileUpload,
+	SDCPCommandFileCancelUpload,
 	SDCPCommandTimeperiod
 };

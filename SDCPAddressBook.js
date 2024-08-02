@@ -3,17 +3,17 @@ const SDCPDiscovery  = require("./SDCPDiscovery");
 const SDCPPrinter    = require("./SDCPPrinter");
 const debug = false;
 
-class SDCPAddressBook 
+class SDCPAddressBook
 {
 	/** string - The file to save to */
 	#addressBookFile = "config.json";
 	/** SDCPAddressBookEntry[] - An array of entries*/
-	#AddressBook = [];	
+	#AddressBook = [];
 	/** Is exiting already */
 	#exiting = false;
 	/** Always online state */
-	AlwaysOn = true;
-	
+	AlwaysOn = false;
+
 	/** Amount of entries in the address book */
 	get length() {return this.#AddressBook.length;}
 	/** @returns {SDCPPrinter[]} - An array of printers */
@@ -46,10 +46,10 @@ class SDCPAddressBook
 		console.log(`Saving address book (${this.#AddressBook.length} entries) to ${this.#addressBookFile}`);
 
 		var Entries = this.#AddressBook.map(e=>e.toJSON());
-		fs.writeFile(this.#addressBookFile, JSON.stringify(Entries, undefined, "\t"), (err) => 
+		fs.writeFile(this.#addressBookFile, JSON.stringify(Entries, undefined, "\t"), (err) =>
 		{
 			if (err) return typeof Callback === "function" ? Callback(err) : undefined;
-			if (typeof Callback === "function") 
+			if (typeof Callback === "function")
 				Callback
 		});
 	}
@@ -72,7 +72,7 @@ class SDCPAddressBook
 	 * @returns {Boolean} - True if the load was successful
 	 */
 	LoadSync()
-	{		
+	{
 		try
 		{
 			var data = fs.readFileSync(this.#addressBookFile);
@@ -81,7 +81,7 @@ class SDCPAddressBook
 			{
 				/** SDCPPrinter.constructor */
 				var PrinterType = SDCPDiscovery.PrinterType(e);
-				this.Add(new PrinterType({...e, AlwaysOn: this.AlwaysOn}));
+				this.Add(new PrinterType({...e, AutoReconnect: this.AlwaysOn ? true : false}));
 			});
 
 			console.log(`Loaded address book (${this.#AddressBook.length} entries) from ${this.#addressBookFile}`);
@@ -99,17 +99,17 @@ class SDCPAddressBook
 		if (Callback === undefined)
 			return new Promise((resolve,reject) => {this.Load((err) => {if (err) return reject(err); resolve();});});
 
-		fs.readFile(this.#addressBookFile, (err, data) => 
+		fs.readFile(this.#addressBookFile, (err, data) =>
 		{
 			if (err) return typeof Callback === "function" ? Callback(err) : undefined;
 			var Entries = JSON.parse(data);
 			this.#AddressBook = Entries.map(e=>
 			{
 				var PrinterType = SDCPDiscovery.PrinterType(e);
-				return newPrinterType({...e, AlwaysOn: this.AlwaysOn})
+				return new PrinterType({...e, AutoReconnect: this.AlwaysOn})
 			});
 			console.log(`Loaded address book (${this.#AddressBook.length} entries) from ${this.#addressBookFile}`);
-			if (typeof Callback === "function") 
+			if (typeof Callback === "function")
 				Callback();
 		});
 	}
@@ -129,7 +129,7 @@ class SDCPAddressBook
 	 */
 	Add(Printer)
 	{
-		if (Printer === undefined || Printer === null) 
+		if (Printer === undefined || Printer === null)
 			return false;
 		if (!Array.isArray(Printer))
 			Printer = [Printer];
@@ -139,16 +139,16 @@ class SDCPAddressBook
 			if (p_orig.MainboardID === undefined || !p_orig.toJSON) return;
 			var p = p_orig.toJSON();
 			var existingEntry = this.#AddressBook.find(e=>e.MainboardID === p.MainboardID);
-			if (!existingEntry) 
+			if (!existingEntry)
 			{
 				console.log(`Adding printer ${p.MainboardID} to address book`);
 				this.#AddressBook.push(p_orig);
 				return;
 			}
-			
+
 			console.log(`Updating printer ${p.MainboardID} in address book`);
 			for (var key in p)
-				existingEntry[key] = p[key];		
+				existingEntry[key] = p[key];
 		});
 		return true;
 		//Already existing?
@@ -175,14 +175,14 @@ class SDCPAddressBook
 	SetupAutoSave()
 	{
 		// Handle normal exit
-		process.on('exit', () => 		
+		process.on('exit', () =>
 		{
 			if (this.#exiting) return;
 			this.#exiting = true;
 			this.SaveSync();
 		});
 		// Handle Ctrl+C
-		process.on('SIGINT', () => 
+		process.on('SIGINT', () =>
 		{
 			if (this.#exiting) return;
 			this.#exiting = true;
@@ -191,13 +191,13 @@ class SDCPAddressBook
 			process.exit(0);
 		});
 		// Handle uncaught exceptions
-		process.on('uncaughtException', (error) => 
+		process.on('uncaughtException', (error) =>
 		{
 			console.log(error);
 
 			if (this.#exiting) return;
 			this.#exiting = true;
-			console.error('Uncaught Exception:', error); 
+			console.error('Uncaught Exception:', error);
 			this.SaveSync();
 			process.exit(1);
 		});
