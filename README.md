@@ -170,7 +170,7 @@ Printer.Connect().then(()=>
 });
 ```
 
-#### `Start (File, Layer)` *(not currently supported in <V3.0.0)*
+#### `Start (File, Layer)`
 Start printing the file `File` (beginning from layer `Layer`). Layer will default to 0.
 ```js
 var Printer = new SDCP.SDCPPrinter();
@@ -183,7 +183,7 @@ Printer.Connect("10.1.1.113").then(()=>
 });
 ```
 
-#### `Pause ()` *(not currently supported in <V3.0.0)*
+#### `Pause ()`
 Pause the printer's current print.
 ```js
 var Printer = new SDCP.SDCPPrinter();
@@ -196,7 +196,7 @@ Printer.Connect("10.1.1.113").then(()=>
 });
 ```
 
-#### `Stop ()` *(not currently supported in <V3.0.0)*
+#### `Stop ()`
 Stop the printer's current print.
 ```js
 var Printer = new SDCP.SDCPPrinter();
@@ -368,7 +368,7 @@ Printer.Connect().then(()=>
 ## File uploading
 Files can be uploaded using `SDCPPrinter.UploadFile()`
 
-#### `UploadFile (File, [Options])` *(not currently supported in <V3.0.0)*
+#### `UploadFile (File, [Options])`
 `File` points to a local file, `Options` can be used to enable/disable verification or have a progress callback called each chunk:
 ```js
 Printer.Connect().then(()=>
@@ -454,6 +454,11 @@ Printer.AutoReconnect = 5000;		//Auto re-connect every 5 seconds
 ---
 
 ## Updates
+
+#### 0.5.4 ####
+- Further consistency for `SDCPPrinterMQTT` (PrintInfo.Status). Print info status is now modified to match V3.0.0 SDCP,
+- Note that the .Broadcast UDP responses are not corrected (yet),
+- Various tweaks and fixes
 
 #### 0.5.3 ####
 - `AutoReconnect` fix for constructors, 

@@ -187,8 +187,30 @@ class SDCPPrinterMQTT extends require("./SDCPPrinter")
 			else
 			{
 				//Adjust to make it match V3.0.0 for consistency
-				if (KEEP_CONSISTENT && Command && Command.Data && Command.Data.Status && Command.Data.Status.CurrentStatus !== undefined)
-					Command.Data.Status.CurrentStatus = [Command.Data.Status.CurrentStatus];
+				if (KEEP_CONSISTENT)
+				{
+					if (Command && Command.Data && Command.Data.Status && Command.Data.Status.CurrentStatus !== undefined)
+						Command.Data.Status.CurrentStatus = [Command.Data.Status.CurrentStatus];
+					if (Command && Command.Data && Command.Data.Status && Command.Data.Status.PrintInfo !== undefined)
+						switch(Command.Data.Status.PrintInfo.Status)
+						{
+							case 2:
+								Command.Data.Status.PrintInfo.Status = 3;
+								break;
+							case 3:
+								Command.Data.Status.PrintInfo.Status = 4;
+								break;
+							case 4:
+								Command.Data.Status.PrintInfo.Status = 2;
+								break;
+							case 16:
+								Command.Data.Status.PrintInfo.Status = 9;
+								break;
+							default:
+								Command.Data.Status.PrintInfo.Status = 0;							
+						}
+				}
+
 				if (JSON.stringify(Command.Data.Status) !== JSON.stringify(this.#LastStatus))
 					this.emit('status', Command.Data.Status);
 				this.#LastStatus = {...Command.Data.Status, Timestamp: Command.Timestamp};
